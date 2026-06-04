@@ -10,10 +10,12 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect } from 'react';
 import { useWorkoutStore } from '@/src/store/workoutStore';
+import { useAuthStore } from '@/src/store/authStore';
 
 export default function PlansScreen() {
   const router = useRouter();
   const { plans, loadFromStorage, deletePlan, isLoaded } = useWorkoutStore();
+  const { signOut } = useAuthStore();
 
   useEffect(() => {
     if (!isLoaded) loadFromStorage();
@@ -59,6 +61,10 @@ export default function PlansScreen() {
       <TouchableOpacity style={styles.fab} onPress={() => router.push('/plan/new')}>
         <Ionicons name="add" size={28} color="#FFFFFF" />
       </TouchableOpacity>
+
+      <TouchableOpacity style={styles.signOutBtn} onPress={signOut}>
+        <Ionicons name="log-out-outline" size={20} color="#8E8E93" />
+      </TouchableOpacity>
     </View>
   );
 }
@@ -94,5 +100,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 8,
     elevation: 8,
+  },
+  signOutBtn: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    padding: 8,
   },
 });
