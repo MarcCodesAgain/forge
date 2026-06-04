@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Platform, ActivityIndicator, Alert,
+  KeyboardAvoidingView, Platform, ActivityIndicator, Alert, ScrollView,
 } from 'react-native';
 import { useAuthStore } from '@/src/store/authStore';
+import { Colors, Spacing, Radius, Typography } from '@/src/theme';
 
 export default function AuthScreen() {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
@@ -14,7 +15,7 @@ export default function AuthScreen() {
 
   const handleSubmit = async () => {
     if (!email || !password) {
-      Alert.alert('Error', 'Rellena email y contraseña');
+      Alert.alert('Campos vacíos', 'Rellena email y contraseña');
       return;
     }
     setLoading(true);
@@ -23,7 +24,7 @@ export default function AuthScreen() {
       : await signUp(email, password);
     setLoading(false);
     if (error) Alert.alert('Error', error);
-    else if (mode === 'signup') Alert.alert('¡Cuenta creada!', 'Revisa tu email para confirmar la cuenta.');
+    else if (mode === 'signup') Alert.alert('¡Cuenta creada!', 'Ya puedes iniciar sesión.');
   };
 
   return (
@@ -31,69 +32,116 @@ export default function AuthScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={styles.inner}>
-        <Text style={styles.logo}>FitJournal</Text>
-        <Text style={styles.tagline}>Trackea tu progreso en el gym</Text>
-
-        <View style={styles.toggle}>
-          <TouchableOpacity
-            style={[styles.toggleBtn, mode === 'signin' && styles.toggleBtnActive]}
-            onPress={() => setMode('signin')}
-          >
-            <Text style={[styles.toggleText, mode === 'signin' && styles.toggleTextActive]}>
-              Iniciar sesión
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.toggleBtn, mode === 'signup' && styles.toggleBtnActive]}
-            onPress={() => setMode('signup')}
-          >
-            <Text style={[styles.toggleText, mode === 'signup' && styles.toggleTextActive]}>
-              Crear cuenta
-            </Text>
-          </TouchableOpacity>
+      <ScrollView contentContainerStyle={styles.inner} keyboardShouldPersistTaps="handled">
+        <View style={styles.logoArea}>
+          <View style={styles.logoIcon}>
+            <Text style={styles.logoEmoji}>💪</Text>
+          </View>
+          <Text style={styles.logoText}>FitJournal</Text>
+          <Text style={styles.tagline}>Registra tu progreso en el gym</Text>
         </View>
 
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          placeholderTextColor="#8E8E93"
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          keyboardType="email-address"
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Contraseña"
-          placeholderTextColor="#8E8E93"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-        />
+        <View style={styles.card}>
+          <View style={styles.toggle}>
+            <TouchableOpacity
+              style={[styles.toggleBtn, mode === 'signin' && styles.toggleBtnActive]}
+              onPress={() => setMode('signin')}
+            >
+              <Text style={[styles.toggleText, mode === 'signin' && styles.toggleTextActive]}>
+                Iniciar sesión
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.toggleBtn, mode === 'signup' && styles.toggleBtnActive]}
+              onPress={() => setMode('signup')}
+            >
+              <Text style={[styles.toggleText, mode === 'signup' && styles.toggleTextActive]}>
+                Crear cuenta
+              </Text>
+            </TouchableOpacity>
+          </View>
 
-        <TouchableOpacity style={styles.btn} onPress={handleSubmit} disabled={loading}>
-          {loading
-            ? <ActivityIndicator color="#FFF" />
-            : <Text style={styles.btnText}>{mode === 'signin' ? 'Entrar' : 'Registrarse'}</Text>
-          }
-        </TouchableOpacity>
-      </View>
+          <View style={styles.field}>
+            <Text style={styles.label}>Email</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="tu@email.com"
+              placeholderTextColor={Colors.textTertiary}
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+            />
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.label}>Contraseña</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Mínimo 6 caracteres"
+              placeholderTextColor={Colors.textTertiary}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+            />
+          </View>
+
+          <TouchableOpacity style={styles.btn} onPress={handleSubmit} disabled={loading}>
+            {loading
+              ? <ActivityIndicator color={Colors.white} />
+              : <Text style={styles.btnText}>{mode === 'signin' ? 'Entrar' : 'Registrarse'}</Text>
+            }
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000000' },
-  inner: { flex: 1, justifyContent: 'center', padding: 28 },
-  logo: { color: '#FFFFFF', fontSize: 36, fontWeight: '800', textAlign: 'center', marginBottom: 8 },
-  tagline: { color: '#8E8E93', fontSize: 15, textAlign: 'center', marginBottom: 40 },
-  toggle: { flexDirection: 'row', backgroundColor: '#1C1C1E', borderRadius: 10, padding: 4, marginBottom: 24 },
-  toggleBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8 },
-  toggleBtnActive: { backgroundColor: '#6C63FF' },
-  toggleText: { color: '#8E8E93', fontWeight: '600' },
-  toggleTextActive: { color: '#FFFFFF' },
-  input: { backgroundColor: '#1C1C1E', color: '#FFFFFF', borderRadius: 10, padding: 14, fontSize: 16, marginBottom: 12 },
-  btn: { backgroundColor: '#6C63FF', borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 8 },
-  btnText: { color: '#FFFFFF', fontSize: 17, fontWeight: '700' },
+  container: { flex: 1, backgroundColor: Colors.background },
+  inner: { flexGrow: 1, justifyContent: 'center', padding: Spacing.lg },
+  logoArea: { alignItems: 'center', marginBottom: Spacing.xl },
+  logoIcon: {
+    width: 72, height: 72, borderRadius: 20, backgroundColor: Colors.accentLight,
+    alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.md,
+  },
+  logoEmoji: { fontSize: 36 },
+  logoText: { ...Typography.largeTitle, marginBottom: Spacing.xs },
+  tagline: { ...Typography.subhead },
+  card: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    padding: Spacing.md,
+  },
+  toggle: {
+    flexDirection: 'row',
+    backgroundColor: Colors.surfaceSecondary,
+    borderRadius: Radius.md,
+    padding: 3,
+    marginBottom: Spacing.md,
+  },
+  toggleBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: Radius.sm },
+  toggleBtnActive: { backgroundColor: Colors.white, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 2 },
+  toggleText: { ...Typography.subhead, color: Colors.textSecondary },
+  toggleTextActive: { color: Colors.accent, fontWeight: '600' },
+  field: { marginBottom: Spacing.md },
+  label: { ...Typography.caption, marginBottom: Spacing.xs, textTransform: 'uppercase', letterSpacing: 0.5 },
+  input: {
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radius.md,
+    padding: 14,
+    fontSize: 16,
+    color: Colors.text,
+  },
+  btn: {
+    backgroundColor: Colors.accent,
+    borderRadius: Radius.md,
+    padding: 16,
+    alignItems: 'center',
+    marginTop: Spacing.xs,
+  },
+  btnText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
 });

@@ -1,6 +1,7 @@
 import { View, Text, FlatList, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useWorkoutStore } from '@/src/store/workoutStore';
+import { Colors, Spacing, Radius, Typography, Shadow } from '@/src/theme';
 
 export default function HistoryScreen() {
   const { logs, plans } = useWorkoutStore();
@@ -17,38 +18,68 @@ export default function HistoryScreen() {
 
   const formatDate = (iso: string) => {
     const d = new Date(iso);
-    return d.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' });
+    return d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+  };
+
+  const formatTime = (iso: string) => {
+    const d = new Date(iso);
+    return d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
   };
 
   return (
     <View style={styles.container}>
       {sortedLogs.length === 0 ? (
         <View style={styles.empty}>
-          <Ionicons name="time-outline" size={64} color="#3A3A3C" />
-          <Text style={styles.emptyText}>Sin entrenamientos registrados</Text>
-          <Text style={styles.emptySubtext}>Completa tu primera sesión para verla aquí</Text>
+          <View style={styles.emptyIcon}>
+            <Ionicons name="time-outline" size={32} color={Colors.accent} />
+          </View>
+          <Text style={styles.emptyTitle}>Sin entrenamientos aún</Text>
+          <Text style={styles.emptySub}>Completa tu primera sesión para verla aquí</Text>
         </View>
       ) : (
         <FlatList
           data={sortedLogs}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={{ padding: 16, gap: 12 }}
+          contentContainerStyle={styles.list}
           renderItem={({ item }) => {
             const { planName, dayName } = getPlanAndDay(item.planId, item.dayId);
+            const completedSets = item.exercises.reduce(
+              (acc, ex) => acc + ex.sets.filter((s) => s.completed).length, 0
+            );
+            const totalSets = item.exercises.reduce((acc, ex) => acc + ex.sets.length, 0);
             return (
               <View style={styles.card}>
                 <View style={styles.cardHeader}>
-                  <View>
+                  <View style={styles.cardIcon}>
+                    <Ionicons name="checkmark-circle" size={20} color={Colors.success} />
+                  </View>
+                  <View style={styles.cardHeaderText}>
                     <Text style={styles.dayName}>{dayName}</Text>
                     <Text style={styles.planName}>{planName}</Text>
                   </View>
-                  <Text style={styles.date}>{formatDate(item.date)}</Text>
+                  <View style={styles.dateBlock}>
+                    <Text style={styles.dateText}>{formatDate(item.date)}</Text>
+                    <Text style={styles.timeText}>{formatTime(item.date)}</Text>
+                  </View>
                 </View>
-                {item.exercises.map((ex) => (
-                  <View key={ex.exerciseId} style={styles.exerciseRow}>
-                    <Text style={styles.exerciseName}>{ex.exerciseName}</Text>
-                    <Text style={styles.setsText}>
-                      {ex.sets.filter((s) => s.completed).length}/{ex.sets.length} series
+
+                <View style={styles.statsRow}>
+                  <View style={styles.stat}>
+                    <Text style={styles.statValue}>{item.exercises.length}</Text>
+                    <Text style={styles.statLabel}>ejercicios</Text>
+                  </View>
+                  <View style={styles.statDivider} />
+                  <View style={styles.stat}>
+                    <Text style={styles.statValue}>{completedSets}/{totalSets}</Text>
+                    <Text style={styles.statLabel}>series</Text>
+                  </View>
+                </View>
+
+                {item.exercises.map((ex, i) => (
+                  <View key={i} style={styles.exRow}>
+                    <Text style={styles.exName}>{ex.exerciseName}</Text>
+                    <Text style={styles.exSets}>
+                      {ex.sets.filter((s) => s.completed).length} series
                     </Text>
                   </View>
                 ))}
@@ -62,16 +93,58 @@ export default function HistoryScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000000' },
-  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 },
-  emptyText: { color: '#FFFFFF', fontSize: 18, fontWeight: '600', marginTop: 16 },
-  emptySubtext: { color: '#8E8E93', fontSize: 14, textAlign: 'center', paddingHorizontal: 32 },
-  card: { backgroundColor: '#1C1C1E', borderRadius: 12, padding: 16 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
-  dayName: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
-  planName: { color: '#8E8E93', fontSize: 13, marginTop: 2 },
-  date: { color: '#6C63FF', fontSize: 13, fontWeight: '600' },
-  exerciseRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderTopWidth: 1, borderTopColor: '#2C2C2E' },
-  exerciseName: { color: '#FFFFFF', fontSize: 14 },
-  setsText: { color: '#8E8E93', fontSize: 13 },
+  container: { flex: 1, backgroundColor: Colors.background },
+  list: { padding: Spacing.md, gap: 12, paddingBottom: 40 },
+  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.sm },
+  emptyIcon: {
+    width: 72, height: 72, borderRadius: 20, backgroundColor: Colors.accentLight,
+    alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.sm,
+  },
+  emptyTitle: { ...Typography.headline },
+  emptySub: { ...Typography.subhead, textAlign: 'center', paddingHorizontal: 32 },
+  card: {
+    backgroundColor: Colors.white,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    overflow: 'hidden',
+    ...Shadow.sm,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.md,
+    gap: Spacing.sm,
+  },
+  cardIcon: {
+    width: 40, height: 40, borderRadius: Radius.sm,
+    backgroundColor: Colors.successLight,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  cardHeaderText: { flex: 1 },
+  dayName: { ...Typography.headline, fontSize: 15 },
+  planName: { ...Typography.caption, marginTop: 2 },
+  dateBlock: { alignItems: 'flex-end' },
+  dateText: { ...Typography.caption, color: Colors.accent, fontWeight: '600', textTransform: 'capitalize' },
+  timeText: { ...Typography.caption, marginTop: 2 },
+  statsRow: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    paddingVertical: Spacing.sm,
+  },
+  stat: { flex: 1, alignItems: 'center' },
+  statValue: { ...Typography.headline, color: Colors.accent },
+  statLabel: { ...Typography.caption, marginTop: 2 },
+  statDivider: { width: 1, backgroundColor: Colors.border },
+  exRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  exName: { ...Typography.body, fontSize: 14 },
+  exSets: { ...Typography.caption },
 });

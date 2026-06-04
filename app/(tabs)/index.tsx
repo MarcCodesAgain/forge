@@ -1,16 +1,12 @@
 import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
+  View, Text, FlatList, TouchableOpacity, StyleSheet, Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect } from 'react';
 import { useWorkoutStore } from '@/src/store/workoutStore';
 import { useAuthStore } from '@/src/store/authStore';
+import { Colors, Spacing, Radius, Typography, Shadow } from '@/src/theme';
 
 export default function PlansScreen() {
   const router = useRouter();
@@ -30,81 +26,92 @@ export default function PlansScreen() {
 
   return (
     <View style={styles.container}>
+      <TouchableOpacity style={styles.signOutBtn} onPress={signOut}>
+        <Ionicons name="log-out-outline" size={20} color={Colors.textTertiary} />
+      </TouchableOpacity>
+
       {plans.length === 0 ? (
         <View style={styles.empty}>
-          <Ionicons name="barbell-outline" size={64} color="#3A3A3C" />
-          <Text style={styles.emptyText}>No tienes rutinas aún</Text>
-          <Text style={styles.emptySubtext}>Crea tu primera rutina de entrenamiento</Text>
+          <View style={styles.emptyIcon}>
+            <Ionicons name="barbell-outline" size={32} color={Colors.accent} />
+          </View>
+          <Text style={styles.emptyTitle}>Sin rutinas todavía</Text>
+          <Text style={styles.emptySub}>Crea tu primera rutina de entrenamiento</Text>
         </View>
       ) : (
         <FlatList
           data={plans}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={{ padding: 16, gap: 12 }}
+          contentContainerStyle={styles.list}
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.card}
+              activeOpacity={0.7}
               onPress={() => router.push({ pathname: '/plan/[id]', params: { id: item.id } })}
             >
-              <View style={styles.cardContent}>
-                <Text style={styles.cardTitle}>{item.name}</Text>
-                <Text style={styles.cardSub}>{item.days.length} días</Text>
+              <View style={styles.cardLeft}>
+                <View style={styles.cardIcon}>
+                  <Ionicons name="barbell-outline" size={18} color={Colors.accent} />
+                </View>
+                <View>
+                  <Text style={styles.cardTitle}>{item.name}</Text>
+                  <Text style={styles.cardSub}>{item.days.length} {item.days.length === 1 ? 'día' : 'días'}</Text>
+                </View>
               </View>
               <TouchableOpacity onPress={() => handleDelete(item.id, item.name)} hitSlop={12}>
-                <Ionicons name="trash-outline" size={20} color="#FF453A" />
+                <Ionicons name="trash-outline" size={18} color={Colors.textTertiary} />
               </TouchableOpacity>
             </TouchableOpacity>
           )}
         />
       )}
 
-      <TouchableOpacity style={styles.fab} onPress={() => router.push('/plan/new')}>
-        <Ionicons name="add" size={28} color="#FFFFFF" />
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.signOutBtn} onPress={signOut}>
-        <Ionicons name="log-out-outline" size={20} color="#8E8E93" />
+      <TouchableOpacity style={styles.fab} onPress={() => router.push('/plan/new')} activeOpacity={0.85}>
+        <Ionicons name="add" size={26} color={Colors.white} />
       </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000000' },
-  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 },
-  emptyText: { color: '#FFFFFF', fontSize: 18, fontWeight: '600', marginTop: 16 },
-  emptySubtext: { color: '#8E8E93', fontSize: 14 },
+  container: { flex: 1, backgroundColor: Colors.background },
+  signOutBtn: { position: 'absolute', top: 16, right: 16, zIndex: 10, padding: 8 },
+  list: { padding: Spacing.md, gap: 10, paddingBottom: 100 },
+  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.sm },
+  emptyIcon: {
+    width: 72, height: 72, borderRadius: 20, backgroundColor: Colors.accentLight,
+    alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.sm,
+  },
+  emptyTitle: { ...Typography.headline },
+  emptySub: { ...Typography.subhead, textAlign: 'center' },
   card: {
-    backgroundColor: '#1C1C1E',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: Colors.white,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    ...Shadow.sm,
   },
-  cardContent: { gap: 4 },
-  cardTitle: { color: '#FFFFFF', fontSize: 17, fontWeight: '600' },
-  cardSub: { color: '#8E8E93', fontSize: 13 },
+  cardLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  cardIcon: {
+    width: 40, height: 40, borderRadius: Radius.sm, backgroundColor: Colors.accentLight,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  cardTitle: { ...Typography.headline, fontSize: 15 },
+  cardSub: { ...Typography.caption, marginTop: 2 },
   fab: {
     position: 'absolute',
-    bottom: 24,
+    bottom: 28,
     right: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#6C63FF',
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: Colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#6C63FF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  signOutBtn: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    padding: 8,
+    ...Shadow.md,
   },
 });

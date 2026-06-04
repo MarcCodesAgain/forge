@@ -56,10 +56,11 @@ function RootNavigator() {
   return (
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: '#1C1C1E' },
-        headerTintColor: '#FFFFFF',
-        headerTitleStyle: { fontWeight: '700' },
-        contentStyle: { backgroundColor: '#000000' },
+        headerStyle: { backgroundColor: '#FFFFFF' },
+        headerShadowVisible: false,
+        headerTintColor: '#1C1C1E',
+        headerTitleStyle: { fontWeight: '700', fontSize: 17, color: '#1C1C1E' },
+        contentStyle: { backgroundColor: '#FFFFFF' },
       }}
     >
       <Stack.Screen name="auth" options={{ headerShown: false }} />

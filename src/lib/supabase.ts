@@ -6,18 +6,20 @@ import { Platform } from 'react-native';
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
 
-// SecureStore only works on native; fall back to localStorage on web
+const isBrowser = typeof window !== 'undefined' && typeof localStorage !== 'undefined';
+
+// SecureStore on native, localStorage on web browser, no-op during SSR
 const ExpoSecureStoreAdapter = {
   getItem: (key: string) => {
-    if (Platform.OS === 'web') return Promise.resolve(localStorage.getItem(key));
+    if (Platform.OS === 'web') return Promise.resolve(isBrowser ? localStorage.getItem(key) : null);
     return SecureStore.getItemAsync(key);
   },
   setItem: (key: string, value: string) => {
-    if (Platform.OS === 'web') { localStorage.setItem(key, value); return Promise.resolve(); }
+    if (Platform.OS === 'web') { if (isBrowser) localStorage.setItem(key, value); return Promise.resolve(); }
     return SecureStore.setItemAsync(key, value);
   },
   removeItem: (key: string) => {
-    if (Platform.OS === 'web') { localStorage.removeItem(key); return Promise.resolve(); }
+    if (Platform.OS === 'web') { if (isBrowser) localStorage.removeItem(key); return Promise.resolve(); }
     return SecureStore.deleteItemAsync(key);
   },
 };
