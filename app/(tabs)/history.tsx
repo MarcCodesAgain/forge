@@ -1,12 +1,18 @@
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { useState, useMemo } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, FlatList, Modal, SafeAreaView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useWorkoutStore } from '@/src/store/workoutStore';
 import { Colors, Typography, Spacing, Radius, GlassCard } from '@/src/theme';
+import ProgressChart from '@/src/components/ProgressChart';
 
 export default function HistoryScreen() {
   const { logs, plans } = useWorkoutStore();
+  const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
+  const [showExPicker, setShowExPicker] = useState(false);
 
-  const sorted = [...logs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const sorted = useMemo(() =>
+    [...logs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+  [logs]);
 
   const getPlanAndDay = (planId: string, dayId: string) => {
     const plan = plans.find((p) => p.id === planId);
@@ -27,93 +33,194 @@ export default function HistoryScreen() {
     log.exercises.reduce((a, ex) =>
       a + ex.sets.filter(s => s.completed).reduce((s, set) => s + set.weight * set.reps, 0), 0);
 
+  // All unique exercise names across all logs
+  const allExercises = useMemo(() => {
+    const names = new Set<string>();
+    logs.forEach(l => l.exercises.forEach(e => names.add(e.exerciseName)));
+    return [...names].sort();
+  }, [logs]);
+
+  // Chart data for selected exercise: max weight per session
+  const chartData = useMemo(() => {
+    if (!selectedExercise) return [];
+    return sorted
+      .slice()
+      .reverse()
+      .map(log => {
+        const ex = log.exercises.find(e => e.exerciseName === selectedExercise);
+        if (!ex) return null;
+        const maxW = Math.max(...ex.sets.filter(s => s.completed && s.weight > 0).map(s => s.weight));
+        if (!isFinite(maxW)) return null;
+        return { date: log.date, value: maxW };
+      })
+      .filter(Boolean) as { date: string; value: number }[];
+  }, [selectedExercise, logs]);
+
+  const totalSessions = sorted.length;
+  const totalVol = sorted.reduce((a, l) => a + totalVolume(l), 0);
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <Text style={styles.pageTitle}>Performance</Text>
 
       {sorted.length === 0 ? (
         <View style={styles.empty}>
-          <Ionicons name="stats-chart-outline" size={48} color={Colors.textTertiary} />
+          <Ionicons name="stats-chart-outline" size={52} color={Colors.textTertiary} />
           <Text style={styles.emptyTitle}>Sin sesiones aún</Text>
-          <Text style={styles.emptySub}>Completa tu primera sesión para ver tu progreso</Text>
+          <Text style={styles.emptySub}>Completa tu primera sesión para ver tu progreso aquí</Text>
         </View>
       ) : (
         <>
           {/* Summary Stats */}
           <View style={styles.statsRow}>
             <View style={[styles.statCard, { borderLeftWidth: 3, borderLeftColor: Colors.accent }]}>
-              <Text style={styles.statValue}>{sorted.length}</Text>
+              <Text style={styles.statValue}>{totalSessions}</Text>
               <Text style={styles.statLabel}>Sesiones</Text>
             </View>
             <View style={[styles.statCard, { borderLeftWidth: 3, borderLeftColor: Colors.blue }]}>
               <Text style={styles.statValue}>
-                {(sorted.reduce((a, l) => a + totalVolume(l), 0) / 1000).toFixed(0)}k
+                {totalVol >= 1000 ? `${(totalVol / 1000).toFixed(1)}k` : totalVol.toFixed(0)}
               </Text>
               <Text style={styles.statLabel}>kg total</Text>
             </View>
+            <View style={[styles.statCard, { borderLeftWidth: 3, borderLeftColor: Colors.success }]}>
+              <Text style={styles.statValue}>{allExercises.length}</Text>
+              <Text style={styles.statLabel}>Ejercicios</Text>
+            </View>
+          </View>
+
+          {/* Progress chart section */}
+          <View style={styles.chartCard}>
+            <View style={styles.chartHeader}>
+              <Text style={styles.chartTitle}>PROGRESIÓN DE PESO</Text>
+              <TouchableOpacity style={styles.exSelector} onPress={() => setShowExPicker(true)}>
+                <Text style={styles.exSelectorText} numberOfLines={1}>
+                  {selectedExercise ?? 'Seleccionar ejercicio'}
+                </Text>
+                <Ionicons name="chevron-down" size={14} color={Colors.accent} />
+              </TouchableOpacity>
+            </View>
+
+            {!selectedExercise ? (
+              <View style={styles.chartEmpty}>
+                <Ionicons name="trending-up-outline" size={32} color={Colors.textTertiary} />
+                <Text style={styles.chartEmptyText}>Selecciona un ejercicio para ver tu progresión de peso</Text>
+              </View>
+            ) : chartData.length < 2 ? (
+              <View style={styles.chartEmpty}>
+                <Text style={styles.chartEmptyText}>Necesitas al menos 2 sesiones con "{selectedExercise}" para ver el gráfico</Text>
+              </View>
+            ) : (
+              <ProgressChart data={chartData} label={selectedExercise} unit=" kg" />
+            )}
           </View>
 
           {/* Session List */}
           <Text style={styles.sectionLabel}>HISTORIAL DE SESIONES</Text>
           {sorted.map((log) => {
-            const { planName, dayName } = getPlanAndDay(log.planId, log.dayId);
+            const { dayName } = getPlanAndDay(log.planId, log.dayId);
             const vol = totalVolume(log);
             const completed = log.exercises.reduce((a, ex) => a + ex.sets.filter(s => s.completed).length, 0);
             return (
-              <TouchableOpacity key={log.id} style={styles.sessionCard} activeOpacity={0.8}>
+              <View key={log.id} style={styles.sessionCard}>
                 <View style={styles.sessionIcon}>
                   <Ionicons name="barbell-outline" size={20} color={Colors.blue} />
                 </View>
                 <View style={styles.sessionInfo}>
                   <Text style={styles.sessionDay}>{dayName}</Text>
-                  {vol > 0
-                    ? <Text style={styles.sessionVolume}>Volumen: {vol.toFixed(0)} kg</Text>
-                    : <Text style={styles.sessionSets}>{completed} series completadas</Text>
-                  }
+                  <Text style={styles.sessionDetail}>
+                    {completed} series{vol > 0 ? ` · ${vol.toFixed(0)} kg` : ''}
+                  </Text>
                 </View>
-                <View style={styles.sessionRight}>
-                  <Text style={styles.sessionDate}>{formatDate(log.date)}</Text>
-                  <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
-                </View>
-              </TouchableOpacity>
+                <Text style={styles.sessionDate}>{formatDate(log.date)}</Text>
+              </View>
             );
           })}
         </>
       )}
+
+      {/* Exercise picker modal */}
+      <Modal visible={showExPicker} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowExPicker(false)}>
+        <SafeAreaView style={styles.modal}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Seleccionar ejercicio</Text>
+            <TouchableOpacity onPress={() => setShowExPicker(false)} hitSlop={12}>
+              <Ionicons name="close" size={24} color={Colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+          <FlatList
+            data={allExercises}
+            keyExtractor={e => e}
+            contentContainerStyle={{ paddingHorizontal: Spacing.md, paddingBottom: 40 }}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={[styles.exRow, selectedExercise === item && styles.exRowActive]}
+                onPress={() => { setSelectedExercise(item); setShowExPicker(false); }}
+              >
+                <Text style={[styles.exRowText, selectedExercise === item && styles.exRowTextActive]}>{item}</Text>
+                {selectedExercise === item && <Ionicons name="checkmark" size={18} color={Colors.accent} />}
+              </TouchableOpacity>
+            )}
+          />
+        </SafeAreaView>
+      </Modal>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  content: { padding: Spacing.md, paddingBottom: 100 },
-  pageTitle: { ...Typography.headlineMd, color: Colors.text, marginBottom: Spacing.md },
+  content: { padding: Spacing.md, paddingBottom: 100, gap: Spacing.md },
+  pageTitle: { ...Typography.headlineMd, color: Colors.text },
 
   empty: { alignItems: 'center', paddingTop: 80, gap: Spacing.sm },
   emptyTitle: { ...Typography.headlineSm, color: Colors.text },
-  emptySub: { ...Typography.labelMd, color: Colors.textTertiary, fontFamily: 'Inter_400Regular', textAlign: 'center' },
+  emptySub: { ...Typography.labelMd, color: Colors.textTertiary, fontFamily: 'Inter_400Regular', textAlign: 'center', paddingHorizontal: 40 },
 
-  statsRow: { flexDirection: 'row', gap: 12, marginBottom: Spacing.md },
+  statsRow: { flexDirection: 'row', gap: 10 },
   statCard: { ...GlassCard, flex: 1, borderRadius: Radius.lg, padding: Spacing.md },
-  statValue: { ...Typography.dataDisplay, color: Colors.text, fontSize: 28 },
+  statValue: { fontFamily: 'Montserrat_700Bold', fontSize: 24, color: Colors.text },
   statLabel: { ...Typography.labelSm, color: Colors.textTertiary, marginTop: 4 },
 
-  sectionLabel: { ...Typography.labelSm, color: Colors.textTertiary, textTransform: 'uppercase', marginBottom: Spacing.sm },
+  chartCard: { ...GlassCard, borderRadius: Radius.lg, padding: Spacing.md, gap: Spacing.md },
+  chartHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  chartTitle: { ...Typography.labelSm, color: Colors.textTertiary, textTransform: 'uppercase', letterSpacing: 1 },
+  exSelector: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: Colors.accentDim, borderRadius: Radius.full,
+    paddingHorizontal: 12, paddingVertical: 5, maxWidth: 180,
+  },
+  exSelectorText: { ...Typography.labelSm, color: Colors.accent, flex: 1 },
+  chartEmpty: { alignItems: 'center', paddingVertical: Spacing.lg, gap: 8 },
+  chartEmptyText: { ...Typography.labelMd, color: Colors.textTertiary, fontFamily: 'Inter_400Regular', textAlign: 'center' },
+
+  sectionLabel: { ...Typography.labelSm, color: Colors.textTertiary, textTransform: 'uppercase' },
 
   sessionCard: {
     ...GlassCard, borderRadius: Radius.lg,
     flexDirection: 'row', alignItems: 'center',
-    padding: Spacing.md, marginBottom: 10, gap: Spacing.md,
+    padding: Spacing.md, gap: Spacing.md,
   },
   sessionIcon: {
     width: 44, height: 44, borderRadius: Radius.sm,
-    backgroundColor: Colors.blueDim,
-    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: Colors.blueDim, alignItems: 'center', justifyContent: 'center',
   },
   sessionInfo: { flex: 1 },
   sessionDay: { ...Typography.labelMd, color: Colors.text },
-  sessionVolume: { ...Typography.labelSm, color: Colors.accent, marginTop: 2 },
-  sessionSets: { ...Typography.labelSm, color: Colors.textTertiary, marginTop: 2 },
-  sessionRight: { alignItems: 'flex-end', gap: 4 },
+  sessionDetail: { ...Typography.labelSm, color: Colors.textTertiary, marginTop: 2 },
   sessionDate: { ...Typography.labelSm, color: Colors.textTertiary },
+
+  modal: { flex: 1, backgroundColor: Colors.background },
+  modalHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    padding: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.border,
+  },
+  modalTitle: { ...Typography.headlineSm, color: Colors.text },
+  exRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border,
+  },
+  exRowActive: { },
+  exRowText: { ...Typography.labelMd, color: Colors.text, fontFamily: 'Inter_400Regular' },
+  exRowTextActive: { color: Colors.accent, fontFamily: 'Inter_600SemiBold' },
 });

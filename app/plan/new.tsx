@@ -6,6 +6,7 @@ import { useWorkoutStore } from '@/src/store/workoutStore';
 import { generateId } from '@/src/lib/uuid';
 import type { WorkoutDay } from '@/src/types';
 import { Colors, Typography, Spacing, Radius, GlassCard, OrangeGlow } from '@/src/theme';
+import ExercisePicker from '@/src/components/ExercisePicker';
 
 export default function NewPlanScreen() {
   const router = useRouter();
@@ -13,6 +14,7 @@ export default function NewPlanScreen() {
   const [planName, setPlanName] = useState('');
   const [days, setDays] = useState<WorkoutDay[]>([]);
   const [saving, setSaving] = useState(false);
+  const [pickerTarget, setPickerTarget] = useState<{ dayId: string } | null>(null);
 
   const addDay = () =>
     setDays(p => [...p, { id: generateId(), name: `Día ${p.length + 1}`, exercises: [] }]);
@@ -23,9 +25,9 @@ export default function NewPlanScreen() {
   const removeDay = (dayId: string) =>
     setDays(p => p.filter(d => d.id !== dayId));
 
-  const addExercise = (dayId: string) =>
+  const addExercise = (dayId: string, name: string) =>
     setDays(p => p.map(d => d.id === dayId
-      ? { ...d, exercises: [...d.exercises, { id: generateId(), name: '', sets: [{ id: generateId(), reps: 10, weight: 0 }] }] }
+      ? { ...d, exercises: [...d.exercises, { id: generateId(), name, sets: [{ id: generateId(), reps: 10, weight: 0 }] }] }
       : d));
 
   const updateExName = (dayId: string, exId: string, name: string) =>
@@ -54,6 +56,13 @@ export default function NewPlanScreen() {
           : e) }
       : d));
 
+  const removeSet = (dayId: string, exId: string, setId: string) =>
+    setDays(p => p.map(d => d.id === dayId
+      ? { ...d, exercises: d.exercises.map(e => e.id === exId
+          ? { ...e, sets: e.sets.filter(s => s.id !== setId) }
+          : e) }
+      : d));
+
   const handleSave = async () => {
     if (!planName.trim()) { Alert.alert('Error', 'Añade un nombre a la rutina'); return; }
     if (days.length === 0) { Alert.alert('Error', 'Añade al menos un día'); return; }
@@ -64,120 +73,138 @@ export default function NewPlanScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
 
-      {/* Nombre */}
-      <Text style={styles.fieldLabel}>NOMBRE DE LA RUTINA</Text>
-      <TextInput
-        style={styles.planInput}
-        placeholder="Ej: Push Day Explosivo"
-        placeholderTextColor={Colors.textTertiary}
-        value={planName}
-        onChangeText={setPlanName}
-      />
+        <Text style={styles.fieldLabel}>NOMBRE DE LA RUTINA</Text>
+        <TextInput
+          style={styles.planInput}
+          placeholder="Ej: Push Day Explosivo"
+          placeholderTextColor={Colors.textTertiary}
+          value={planName}
+          onChangeText={setPlanName}
+        />
 
-      {/* Días */}
-      {days.map((day, di) => (
-        <View key={day.id} style={styles.dayCard}>
-          <View style={styles.dayHeader}>
-            <View style={styles.dayNum}><Text style={styles.dayNumText}>{di + 1}</Text></View>
-            <TextInput
-              style={styles.dayNameInput}
-              value={day.name}
-              onChangeText={t => updateDayName(day.id, t)}
-              placeholder="Nombre del día"
-              placeholderTextColor={Colors.textTertiary}
-            />
-            <TouchableOpacity onPress={() => removeDay(day.id)} hitSlop={12}>
-              <Ionicons name="trash-outline" size={18} color={Colors.textTertiary} />
-            </TouchableOpacity>
-          </View>
-
-          {day.exercises.map((ex, ei) => (
-            <View key={ex.id} style={styles.exCard}>
-              <View style={styles.exHeader}>
-                <Text style={styles.exLabel}>EJERCICIO {ei + 1}</Text>
-                <TouchableOpacity onPress={() => removeExercise(day.id, ex.id)} hitSlop={12}>
-                  <Ionicons name="close" size={18} color={Colors.textTertiary} />
-                </TouchableOpacity>
-              </View>
+        {days.map((day, di) => (
+          <View key={day.id} style={styles.dayCard}>
+            <View style={styles.dayHeader}>
+              <View style={styles.dayNum}><Text style={styles.dayNumText}>{di + 1}</Text></View>
               <TextInput
-                style={styles.exInput}
-                placeholder="Nombre del ejercicio"
+                style={styles.dayNameInput}
+                value={day.name}
+                onChangeText={t => updateDayName(day.id, t)}
+                placeholder="Nombre del día"
                 placeholderTextColor={Colors.textTertiary}
-                value={ex.name}
-                onChangeText={t => updateExName(day.id, ex.id, t)}
               />
-
-              {/* Header columnas */}
-              <View style={styles.setHeaderRow}>
-                <Text style={[styles.colHead, { width: 28 }]}>#</Text>
-                <Text style={[styles.colHead, { flex: 1 }]}>kg</Text>
-                <Text style={[styles.colHead, { flex: 1 }]}>reps</Text>
-              </View>
-
-              {ex.sets.map((set, si) => (
-                <View key={set.id} style={styles.setRow}>
-                  <Text style={styles.setNum}>{si + 1}</Text>
-                  <TextInput
-                    style={styles.setInput}
-                    keyboardType="decimal-pad"
-                    value={String(set.weight)}
-                    onChangeText={v => updateSet(day.id, ex.id, set.id, 'weight', v)}
-                    selectTextOnFocus
-                  />
-                  <TextInput
-                    style={styles.setInput}
-                    keyboardType="numeric"
-                    value={String(set.reps)}
-                    onChangeText={v => updateSet(day.id, ex.id, set.id, 'reps', v)}
-                    selectTextOnFocus
-                  />
-                </View>
-              ))}
-
-              <TouchableOpacity style={styles.addSetBtn} onPress={() => addSet(day.id, ex.id)}>
-                <Ionicons name="add" size={14} color={Colors.accent} />
-                <Text style={styles.addSetText}>Añadir serie</Text>
+              <TouchableOpacity onPress={() => removeDay(day.id)} hitSlop={12}>
+                <Ionicons name="trash-outline" size={18} color={Colors.textTertiary} />
               </TouchableOpacity>
             </View>
-          ))}
 
-          <TouchableOpacity style={styles.addExBtn} onPress={() => addExercise(day.id)}>
-            <Ionicons name="add-circle-outline" size={18} color={Colors.accent} />
-            <Text style={styles.addExText}>Añadir ejercicio</Text>
-          </TouchableOpacity>
-        </View>
-      ))}
+            {day.exercises.map((ex, ei) => (
+              <View key={ex.id} style={styles.exCard}>
+                <View style={styles.exHeader}>
+                  <View style={styles.exMuscleTag}>
+                    <Ionicons name="barbell-outline" size={14} color={Colors.accent} />
+                    <Text style={styles.exNum}>EJ. {ei + 1}</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => removeExercise(day.id, ex.id)} hitSlop={12}>
+                    <Ionicons name="close" size={18} color={Colors.textTertiary} />
+                  </TouchableOpacity>
+                </View>
+                <TextInput
+                  style={styles.exInput}
+                  placeholder="Nombre del ejercicio"
+                  placeholderTextColor={Colors.textTertiary}
+                  value={ex.name}
+                  onChangeText={t => updateExName(day.id, ex.id, t)}
+                />
 
-      <TouchableOpacity style={styles.addDayBtn} onPress={addDay}>
-        <Ionicons name="add-circle-outline" size={20} color={Colors.accent} />
-        <Text style={styles.addDayText}>Añadir día de entrenamiento</Text>
-      </TouchableOpacity>
+                <View style={styles.setHeaderRow}>
+                  <Text style={[styles.colHead, { width: 32 }]}>#</Text>
+                  <Text style={[styles.colHead, { flex: 1 }]}>kg</Text>
+                  <Text style={[styles.colHead, { flex: 1 }]}>reps</Text>
+                  <View style={{ width: 28 }} />
+                </View>
 
-      <TouchableOpacity
-        style={[styles.saveBtn, saving && { opacity: 0.6 }]}
-        onPress={handleSave} disabled={saving}
-        activeOpacity={0.85}
-      >
-        <Ionicons name="save-outline" size={20} color={Colors.black} />
-        <Text style={styles.saveBtnText}>{saving ? 'Guardando...' : 'Guardar Rutina'}</Text>
-      </TouchableOpacity>
-    </ScrollView>
+                {ex.sets.map((set, si) => (
+                  <View key={set.id} style={styles.setRow}>
+                    <Text style={styles.setNum}>{si + 1}</Text>
+                    <TextInput
+                      style={styles.setInput}
+                      keyboardType="decimal-pad"
+                      value={String(set.weight)}
+                      onChangeText={v => updateSet(day.id, ex.id, set.id, 'weight', v)}
+                      selectTextOnFocus
+                    />
+                    <TextInput
+                      style={styles.setInput}
+                      keyboardType="numeric"
+                      value={String(set.reps)}
+                      onChangeText={v => updateSet(day.id, ex.id, set.id, 'reps', v)}
+                      selectTextOnFocus
+                    />
+                    <TouchableOpacity
+                      style={{ width: 28, alignItems: 'center' }}
+                      onPress={() => removeSet(day.id, ex.id, set.id)}
+                      disabled={ex.sets.length === 1}
+                      hitSlop={8}
+                    >
+                      <Ionicons
+                        name="remove-circle-outline"
+                        size={18}
+                        color={ex.sets.length === 1 ? Colors.surfaceBright : Colors.textTertiary}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+
+                <TouchableOpacity style={styles.addSetBtn} onPress={() => addSet(day.id, ex.id)}>
+                  <Ionicons name="add" size={14} color={Colors.accent} />
+                  <Text style={styles.addSetText}>Añadir serie</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+
+            <TouchableOpacity style={styles.addExBtn} onPress={() => setPickerTarget({ dayId: day.id })}>
+              <Ionicons name="search-outline" size={18} color={Colors.accent} />
+              <Text style={styles.addExText}>Buscar y añadir ejercicio</Text>
+            </TouchableOpacity>
+          </View>
+        ))}
+
+        <TouchableOpacity style={styles.addDayBtn} onPress={addDay}>
+          <Ionicons name="add-circle-outline" size={20} color={Colors.accent} />
+          <Text style={styles.addDayText}>Añadir día de entrenamiento</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.saveBtn, saving && { opacity: 0.6 }]}
+          onPress={handleSave} disabled={saving} activeOpacity={0.85}
+        >
+          <Ionicons name="save-outline" size={20} color={Colors.black} />
+          <Text style={styles.saveBtnText}>{saving ? 'Guardando...' : 'Guardar Rutina'}</Text>
+        </TouchableOpacity>
+      </ScrollView>
+
+      <ExercisePicker
+        visible={!!pickerTarget}
+        onSelect={name => pickerTarget && addExercise(pickerTarget.dayId, name)}
+        onClose={() => setPickerTarget(null)}
+      />
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   content: { padding: Spacing.md, gap: Spacing.md, paddingBottom: 60 },
-
   fieldLabel: { ...Typography.labelSm, color: Colors.textTertiary, textTransform: 'uppercase' },
   planInput: {
     borderBottomWidth: 2, borderBottomColor: Colors.borderVariant,
     color: Colors.text, fontSize: 18, fontFamily: 'Montserrat_700Bold',
-    paddingVertical: 10, paddingHorizontal: 0,
+    paddingVertical: 10,
   },
-
   dayCard: { ...GlassCard, borderRadius: Radius.lg, overflow: 'hidden' },
   dayHeader: {
     flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
@@ -190,52 +217,45 @@ const styles = StyleSheet.create({
   },
   dayNumText: { ...Typography.labelMd, color: Colors.black },
   dayNameInput: { flex: 1, ...Typography.bodyMd, color: Colors.text, fontFamily: 'Inter_600SemiBold' },
-
   exCard: {
     margin: Spacing.md, marginBottom: 0,
-    backgroundColor: Colors.surfaceHigh,
-    borderRadius: Radius.sm, padding: Spacing.sm,
-    borderWidth: 1, borderColor: Colors.border,
+    backgroundColor: Colors.surfaceHigh, borderRadius: Radius.sm,
+    padding: Spacing.sm, borderWidth: 1, borderColor: Colors.border,
   },
   exHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  exLabel: { ...Typography.labelSm, color: Colors.textTertiary, textTransform: 'uppercase' },
+  exMuscleTag: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  exNum: { ...Typography.labelSm, color: Colors.textTertiary, textTransform: 'uppercase' },
   exInput: {
     borderBottomWidth: 1, borderBottomColor: Colors.borderVariant,
     color: Colors.text, fontSize: 15, fontFamily: 'Inter_400Regular',
     paddingVertical: 6, marginBottom: Spacing.sm,
   },
-
   setHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
   colHead: { ...Typography.labelSm, color: Colors.textTertiary, textAlign: 'center', textTransform: 'uppercase' },
   setRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
-  setNum: { width: 28, ...Typography.labelSm, color: Colors.textTertiary, textAlign: 'center' },
+  setNum: { width: 32, ...Typography.labelSm, color: Colors.textTertiary, textAlign: 'center' },
   setInput: {
     flex: 1, backgroundColor: Colors.surface,
     borderBottomWidth: 2, borderBottomColor: Colors.borderVariant,
     color: Colors.text, fontSize: 15, fontFamily: 'Inter_600SemiBold',
-    paddingVertical: 6, paddingHorizontal: 8, textAlign: 'center',
+    paddingVertical: 6, textAlign: 'center',
   },
-
   addSetBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: Spacing.sm, alignSelf: 'flex-start' },
   addSetText: { ...Typography.labelSm, color: Colors.accent },
-
   addExBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     padding: Spacing.md, borderTopWidth: 1, borderTopColor: Colors.border, marginTop: Spacing.md,
   },
   addExText: { ...Typography.labelMd, color: Colors.accent },
-
   addDayBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    borderWidth: 1, borderColor: Colors.accentDim,
+    borderWidth: 1, borderColor: `${Colors.accent}40`,
     borderRadius: Radius.lg, padding: 14, backgroundColor: Colors.accentDim,
   },
   addDayText: { ...Typography.labelMd, color: Colors.accent },
-
   saveBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: Colors.accent, borderRadius: Radius.lg, padding: 16,
-    ...OrangeGlow,
+    backgroundColor: Colors.accent, borderRadius: Radius.lg, padding: 16, ...OrangeGlow,
   },
   saveBtnText: { ...Typography.headlineSm, color: Colors.black, fontSize: 16 },
 });
