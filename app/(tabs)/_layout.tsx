@@ -9,41 +9,44 @@ export default function TabLayout() {
         tabBarActiveTintColor: Colors.accent,
         tabBarInactiveTintColor: Colors.textTertiary,
         tabBarStyle: {
-          backgroundColor: Colors.white,
+          backgroundColor: Colors.surface,
           borderTopColor: Colors.border,
           borderTopWidth: 1,
+          height: 72,
+          paddingBottom: 12,
+          paddingTop: 8,
         },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '500' },
-        headerStyle: { backgroundColor: Colors.white },
+        tabBarLabelStyle: { fontSize: 11, fontFamily: 'Inter_600SemiBold', letterSpacing: 0.5 },
+        headerStyle: { backgroundColor: Colors.background },
         headerTintColor: Colors.text,
-        headerTitleStyle: { fontWeight: '700', fontSize: 17, color: Colors.text },
+        headerTitleStyle: { fontFamily: 'Montserrat_700Bold', fontSize: 17 },
         headerShadowVisible: false,
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Rutinas',
+          title: 'Home',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="barbell-outline" size={size} color={color} />
+            <Ionicons name="home-outline" size={size} color={color} />
           ),
         }}
       />
       <Tabs.Screen
         name="workout"
         options={{
-          title: 'Entrenar',
+          title: 'Routines',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="play-circle-outline" size={size} color={color} />
+            <Ionicons name="barbell-outline" size={size} color={color} />
           ),
         }}
       />
       <Tabs.Screen
         name="history"
         options={{
-          title: 'Historial',
+          title: 'History',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="time-outline" size={size} color={color} />
+            <Ionicons name="stats-chart-outline" size={size} color={color} />
           ),
         }}
       />

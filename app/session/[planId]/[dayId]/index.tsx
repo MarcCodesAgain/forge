@@ -1,72 +1,72 @@
-import { useState, useMemo } from 'react';
-import {
-  View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert,
-} from 'react-native';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useWorkoutStore } from '@/src/store/workoutStore';
 import { generateId } from '@/src/lib/uuid';
 import type { LoggedSet } from '@/src/types';
-import { Colors, Spacing, Radius, Typography, Shadow } from '@/src/theme';
+import { Colors, Typography, Spacing, Radius, GlassCard, OrangeGlow } from '@/src/theme';
 
 export default function SessionScreen() {
   const { planId, dayId } = useLocalSearchParams<{ planId: string; dayId: string }>();
   const router = useRouter();
   const { plans, addLog } = useWorkoutStore();
+  const [saving, setSaving] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const plan = plans.find((p) => p.id === planId);
-  const day = plan?.days.find((d) => d.id === dayId);
+  const plan = plans.find(p => p.id === planId);
+  const day = plan?.days.find(d => d.id === dayId);
 
-  const initialState = useMemo(
-    () =>
-      (day?.exercises ?? []).map((ex) => ({
-        exerciseId: ex.id,
-        exerciseName: ex.name,
-        sets: ex.sets.map((s) => ({ reps: s.reps, weight: s.weight, completed: false })) as LoggedSet[],
-      })),
-    []
+  const initial = useMemo(() =>
+    (day?.exercises ?? []).map(ex => ({
+      exerciseId: ex.id,
+      exerciseName: ex.name,
+      sets: ex.sets.map(s => ({ reps: s.reps, weight: s.weight, completed: false })) as LoggedSet[],
+    }))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  , [planId, dayId]);
+
+  const [exercises, setExercises] = useState(initial);
+
+  useEffect(() => {
+    timerRef.current = setInterval(() => setElapsed(e => e + 1), 1000);
+    return () => clearInterval(timerRef.current);
+  }, []);
+
+  const formatTime = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+  };
+
+  if (!plan || !day) return (
+    <View style={styles.center}>
+      <Text style={styles.errorText}>Día no encontrado</Text>
+    </View>
   );
 
-  const [exercises, setExercises] = useState(initialState);
-  const [saving, setSaving] = useState(false);
+  const completedCount = exercises.reduce((a, ex) => a + ex.sets.filter(s => s.completed).length, 0);
+  const totalCount = exercises.reduce((a, ex) => a + ex.sets.length, 0);
 
-  if (!plan || !day) {
-    return (
-      <View style={styles.center}>
-        <Text style={styles.errorText}>Día no encontrado</Text>
-      </View>
-    );
-  }
+  const toggleSet = (ei: number, si: number) =>
+    setExercises(p => p.map((ex, i) => i !== ei ? ex : {
+      ...ex, sets: ex.sets.map((s, j) => j !== si ? s : { ...s, completed: !s.completed }),
+    }));
 
-  const completedCount = exercises.reduce((acc, ex) => acc + ex.sets.filter((s) => s.completed).length, 0);
-  const totalCount = exercises.reduce((acc, ex) => acc + ex.sets.length, 0);
-  const progress = totalCount > 0 ? completedCount / totalCount : 0;
-
-  const toggleSet = (exIdx: number, setIdx: number) =>
-    setExercises((prev) =>
-      prev.map((ex, i) =>
-        i === exIdx
-          ? { ...ex, sets: ex.sets.map((s, j) => j === setIdx ? { ...s, completed: !s.completed } : s) }
-          : ex
-      )
-    );
-
-  const updateSetField = (exIdx: number, setIdx: number, field: 'reps' | 'weight', value: string) => {
+  const updateField = (ei: number, si: number, field: 'reps' | 'weight', value: string) => {
     const num = parseFloat(value) || 0;
-    setExercises((prev) =>
-      prev.map((ex, i) =>
-        i === exIdx
-          ? { ...ex, sets: ex.sets.map((s, j) => j === setIdx ? { ...s, [field]: num } : s) }
-          : ex
-      )
-    );
+    setExercises(p => p.map((ex, i) => i !== ei ? ex : {
+      ...ex, sets: ex.sets.map((s, j) => j !== si ? s : { ...s, [field]: num }),
+    }));
   };
 
   const handleFinish = async () => {
+    clearInterval(timerRef.current);
     setSaving(true);
     await addLog({ id: generateId(), planId, dayId, date: new Date().toISOString(), exercises });
     setSaving(false);
-    Alert.alert('¡Entrenamiento guardado!', `${completedCount} series completadas`, [
+    Alert.alert('¡Entreno guardado!', `${completedCount} series · ${formatTime(elapsed)}`, [
       { text: 'Ver historial', onPress: () => router.replace('/(tabs)/history') },
       { text: 'OK', onPress: () => router.back() },
     ]);
@@ -76,64 +76,69 @@ export default function SessionScreen() {
     <View style={styles.container}>
       {/* Progress bar */}
       <View style={styles.progressBar}>
-        <View style={[styles.progressFill, { width: `${progress * 100}%` as any }]} />
+        <View style={[styles.progressFill, { width: `${totalCount > 0 ? (completedCount / totalCount) * 100 : 0}%` as any }]} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.dayName}>{day.name}</Text>
-          <Text style={styles.planName}>{plan.name}</Text>
-          <View style={styles.progressLabel}>
-            <Ionicons name="checkmark-circle" size={14} color={Colors.success} />
-            <Text style={styles.progressText}>{completedCount} / {totalCount} series</Text>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Session header */}
+        <View style={styles.sessionHeader}>
+          <View>
+            <Text style={styles.sessionActive}>SESSION ACTIVE</Text>
+            <Text style={styles.timer}>{formatTime(elapsed)}</Text>
+          </View>
+          <View style={styles.sessionMeta}>
+            <Text style={styles.dayName}>{day.name}</Text>
+            <Text style={styles.planName}>{plan.name}</Text>
+            <Text style={styles.setsCount}>{completedCount}/{totalCount} series</Text>
           </View>
         </View>
 
-        {/* Ejercicios */}
-        {exercises.map((ex, exIdx) => {
-          const exCompleted = ex.sets.every((s) => s.completed);
+        {/* Exercise cards */}
+        {exercises.map((ex, ei) => {
+          const allDone = ex.sets.every(s => s.completed);
           return (
-            <View key={ex.exerciseId} style={[styles.exerciseCard, exCompleted && styles.exerciseCardDone]}>
-              <View style={styles.exerciseHeader}>
-                <Text style={styles.exerciseName}>{ex.exerciseName || `Ejercicio ${exIdx + 1}`}</Text>
-                {exCompleted && <Ionicons name="checkmark-circle" size={18} color={Colors.success} />}
+            <View key={ex.exerciseId} style={[styles.exCard, allDone && styles.exCardDone]}>
+              <View style={styles.exHeader}>
+                <View>
+                  <Text style={styles.exName}>{ex.exerciseName || `Ejercicio ${ei + 1}`}</Text>
+                  <Text style={styles.exSub}>{ex.sets.length} Sets</Text>
+                </View>
+                {allDone
+                  ? <Ionicons name="checkmark-circle" size={22} color={Colors.success} />
+                  : <Ionicons name="barbell-outline" size={22} color={Colors.blue} />
+                }
               </View>
 
-              <View style={styles.tableHeader}>
-                <Text style={[styles.colHead, styles.cSerie]}>#</Text>
-                <Text style={[styles.colHead, styles.cReps]}>Reps</Text>
-                <Text style={[styles.colHead, styles.cWeight]}>kg</Text>
-                <Text style={[styles.colHead, styles.cCheck]}>Hecho</Text>
-              </View>
-
-              {ex.sets.map((set, setIdx) => (
-                <View key={setIdx} style={[styles.setRow, set.completed && styles.setRowDone]}>
-                  <Text style={[styles.setNum, styles.cSerie]}>{setIdx + 1}</Text>
-                  <TextInput
-                    style={[styles.setInput, styles.cReps, set.completed && styles.setInputDone]}
-                    keyboardType="numeric"
-                    value={String(set.reps)}
-                    onChangeText={(v) => updateSetField(exIdx, setIdx, 'reps', v)}
-                    editable={!set.completed}
-                    selectTextOnFocus
-                  />
-                  <TextInput
-                    style={[styles.setInput, styles.cWeight, set.completed && styles.setInputDone]}
-                    keyboardType="decimal-pad"
-                    value={String(set.weight)}
-                    onChangeText={(v) => updateSetField(exIdx, setIdx, 'weight', v)}
-                    editable={!set.completed}
-                    selectTextOnFocus
-                  />
-                  <TouchableOpacity
-                    style={[styles.checkBtn, styles.cCheck, set.completed && styles.checkBtnDone]}
-                    onPress={() => toggleSet(exIdx, setIdx)}
-                  >
+              {ex.sets.map((set, si) => (
+                <View key={si} style={styles.setGrid}>
+                  <Text style={styles.setLabel}>SET {si + 1}</Text>
+                  <View style={styles.inputWrap}>
+                    <TextInput
+                      style={[styles.setInput, set.completed && styles.setInputDone]}
+                      keyboardType="decimal-pad"
+                      value={String(set.weight)}
+                      onChangeText={v => updateField(ei, si, 'weight', v)}
+                      editable={!set.completed}
+                      selectTextOnFocus
+                    />
+                    <Text style={styles.inputUnit}>kg</Text>
+                  </View>
+                  <View style={styles.inputWrap}>
+                    <TextInput
+                      style={[styles.setInput, set.completed && styles.setInputDone]}
+                      keyboardType="numeric"
+                      value={String(set.reps)}
+                      onChangeText={v => updateField(ei, si, 'reps', v)}
+                      editable={!set.completed}
+                      selectTextOnFocus
+                    />
+                    <Text style={styles.inputUnit}>reps</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => toggleSet(ei, si)} style={styles.checkBtn}>
                     <Ionicons
                       name={set.completed ? 'checkmark-circle' : 'ellipse-outline'}
-                      size={26}
-                      color={set.completed ? Colors.success : Colors.border}
+                      size={28}
+                      color={set.completed ? Colors.success : Colors.borderVariant}
                     />
                   </TouchableOpacity>
                 </View>
@@ -142,13 +147,17 @@ export default function SessionScreen() {
           );
         })}
 
+        {/* Finish */}
         <TouchableOpacity
           style={[styles.finishBtn, saving && { opacity: 0.6 }]}
-          onPress={handleFinish}
-          disabled={saving}
+          onPress={handleFinish} disabled={saving} activeOpacity={0.85}
         >
-          <Ionicons name="checkmark-circle-outline" size={20} color={Colors.white} />
-          <Text style={styles.finishText}>{saving ? 'Guardando...' : 'Finalizar entrenamiento'}</Text>
+          <Text style={styles.finishText}>{saving ? 'Guardando...' : 'Finalizar y Guardar Entreno'}</Text>
+          <Ionicons name="checkmark-circle" size={22} color={Colors.black} />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.discardBtn} onPress={() => router.back()}>
+          <Text style={styles.discardText}>Descartar sesión</Text>
         </TouchableOpacity>
       </ScrollView>
     </View>
@@ -158,64 +167,47 @@ export default function SessionScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background },
-  errorText: { ...Typography.body, color: Colors.textSecondary },
-  progressBar: { height: 3, backgroundColor: Colors.border },
-  progressFill: { height: 3, backgroundColor: Colors.success },
+  errorText: { ...Typography.bodyMd, color: Colors.textTertiary },
+  progressBar: { height: 3, backgroundColor: Colors.surfaceHigh },
+  progressFill: { height: 3, backgroundColor: Colors.accent },
   content: { padding: Spacing.md, gap: Spacing.md, paddingBottom: 60 },
-  header: { gap: 4, marginBottom: Spacing.xs },
-  dayName: { ...Typography.title },
-  planName: { ...Typography.subhead },
-  progressLabel: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  progressText: { ...Typography.caption, color: Colors.success, fontWeight: '600' },
-  exerciseCard: {
-    backgroundColor: Colors.white,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    overflow: 'hidden',
-    ...Shadow.sm,
+
+  sessionHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
+    marginBottom: Spacing.xs,
   },
-  exerciseCardDone: { borderColor: Colors.success + '60' },
-  exerciseHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    padding: Spacing.md, backgroundColor: Colors.surface,
-    borderBottomWidth: 1, borderBottomColor: Colors.border,
-  },
-  exerciseName: { ...Typography.headline, fontSize: 15 },
-  tableHeader: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: Spacing.md, paddingVertical: 8,
-    borderBottomWidth: 1, borderBottomColor: Colors.border,
-  },
-  colHead: { ...Typography.caption, textAlign: 'center', textTransform: 'uppercase', letterSpacing: 0.4 },
-  cSerie: { width: 28 },
-  cReps: { flex: 1 },
-  cWeight: { flex: 1 },
-  cCheck: { width: 56, textAlign: 'center' },
-  setRow: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: Spacing.md, paddingVertical: 6,
-    borderBottomWidth: 1, borderBottomColor: Colors.border,
-    gap: 6,
-  },
-  setRowDone: { backgroundColor: Colors.successLight },
-  setNum: { ...Typography.caption, textAlign: 'center', color: Colors.textTertiary },
+  sessionActive: { ...Typography.labelSm, color: Colors.accent, textTransform: 'uppercase', letterSpacing: 2 },
+  timer: { fontFamily: 'Montserrat_700Bold', fontSize: 36, color: Colors.accent, lineHeight: 44 },
+  sessionMeta: { alignItems: 'flex-end', gap: 2 },
+  dayName: { ...Typography.headlineSm, color: Colors.text, fontSize: 16 },
+  planName: { ...Typography.labelSm, color: Colors.textTertiary },
+  setsCount: { ...Typography.labelSm, color: Colors.success, marginTop: 4 },
+
+  exCard: { ...GlassCard, borderRadius: Radius.lg, padding: Spacing.md, gap: Spacing.sm },
+  exCardDone: { borderColor: `${Colors.success}30` },
+  exHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  exName: { ...Typography.headlineSm, color: Colors.text, fontSize: 18 },
+  exSub: { ...Typography.labelSm, color: Colors.textTertiary, marginTop: 2 },
+
+  setGrid: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  setLabel: { width: 42, ...Typography.labelSm, color: Colors.textTertiary },
+  inputWrap: { flex: 1, position: 'relative' },
   setInput: {
-    backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border,
-    borderRadius: Radius.sm, padding: 8, textAlign: 'center', fontSize: 15, color: Colors.text,
+    backgroundColor: Colors.surface,
+    borderBottomWidth: 2, borderBottomColor: Colors.borderVariant,
+    color: Colors.text, fontFamily: 'Montserrat_700Bold', fontSize: 16,
+    paddingVertical: 8, paddingHorizontal: 4, textAlign: 'center',
   },
-  setInputDone: { backgroundColor: Colors.successLight, borderColor: 'transparent', color: Colors.textSecondary },
-  checkBtn: { alignItems: 'center', justifyContent: 'center' },
-  checkBtnDone: {},
+  setInputDone: { color: Colors.success, borderBottomColor: Colors.success + '40' },
+  inputUnit: { ...Typography.labelSm, color: Colors.textTertiary, textAlign: 'center', marginTop: 2 },
+  checkBtn: { width: 36, alignItems: 'center' },
+
   finishBtn: {
-    backgroundColor: Colors.accent,
-    borderRadius: Radius.md,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.xs,
-    marginTop: Spacing.xs,
+    backgroundColor: Colors.accent, borderRadius: Radius.lg,
+    padding: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
+    ...OrangeGlow,
   },
-  finishText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
+  finishText: { fontFamily: 'Montserrat_700Bold', fontSize: 16, color: Colors.black },
+  discardBtn: { alignItems: 'center', padding: 12 },
+  discardText: { ...Typography.labelMd, color: Colors.error },
 });

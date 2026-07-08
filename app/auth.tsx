@@ -4,7 +4,7 @@ import {
   KeyboardAvoidingView, Platform, ActivityIndicator, Alert, ScrollView,
 } from 'react-native';
 import { useAuthStore } from '@/src/store/authStore';
-import { Colors, Spacing, Radius, Typography } from '@/src/theme';
+import { Colors, Typography, Spacing, Radius, GlassCard, OrangeGlow } from '@/src/theme';
 
 export default function AuthScreen() {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
@@ -14,34 +14,27 @@ export default function AuthScreen() {
   const { signIn, signUp } = useAuthStore();
 
   const handleSubmit = async () => {
-    if (!email || !password) {
-      Alert.alert('Campos vacíos', 'Rellena email y contraseña');
-      return;
-    }
+    if (!email || !password) { Alert.alert('Error', 'Rellena email y contraseña'); return; }
     setLoading(true);
-    const error = mode === 'signin'
-      ? await signIn(email, password)
-      : await signUp(email, password);
+    const error = mode === 'signin' ? await signIn(email, password) : await signUp(email, password);
     setLoading(false);
     if (error) Alert.alert('Error', error);
     else if (mode === 'signup') Alert.alert('¡Cuenta creada!', 'Ya puedes iniciar sesión.');
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.inner} keyboardShouldPersistTaps="handled">
+
+        {/* Logo */}
         <View style={styles.logoArea}>
-          <View style={styles.logoIcon}>
-            <Text style={styles.logoEmoji}>💪</Text>
-          </View>
-          <Text style={styles.logoText}>FitJournal</Text>
-          <Text style={styles.tagline}>Registra tu progreso en el gym</Text>
+          <Text style={styles.logoText}>FORGE</Text>
+          <Text style={styles.tagline}>Trackea tu progreso en el gym</Text>
         </View>
 
+        {/* Card */}
         <View style={styles.card}>
+          {/* Toggle */}
           <View style={styles.toggle}>
             <TouchableOpacity
               style={[styles.toggleBtn, mode === 'signin' && styles.toggleBtnActive]}
@@ -61,8 +54,9 @@ export default function AuthScreen() {
             </TouchableOpacity>
           </View>
 
+          {/* Inputs */}
           <View style={styles.field}>
-            <Text style={styles.label}>Email</Text>
+            <Text style={styles.fieldLabel}>EMAIL</Text>
             <TextInput
               style={styles.input}
               placeholder="tu@email.com"
@@ -73,9 +67,8 @@ export default function AuthScreen() {
               keyboardType="email-address"
             />
           </View>
-
           <View style={styles.field}>
-            <Text style={styles.label}>Contraseña</Text>
+            <Text style={styles.fieldLabel}>CONTRASEÑA</Text>
             <TextInput
               style={styles.input}
               placeholder="Mínimo 6 caracteres"
@@ -86,10 +79,10 @@ export default function AuthScreen() {
             />
           </View>
 
-          <TouchableOpacity style={styles.btn} onPress={handleSubmit} disabled={loading}>
+          <TouchableOpacity style={styles.btn} onPress={handleSubmit} disabled={loading} activeOpacity={0.85}>
             {loading
-              ? <ActivityIndicator color={Colors.white} />
-              : <Text style={styles.btnText}>{mode === 'signin' ? 'Entrar' : 'Registrarse'}</Text>
+              ? <ActivityIndicator color={Colors.black} />
+              : <Text style={styles.btnText}>{mode === 'signin' ? 'ENTRAR' : 'REGISTRARSE'}</Text>
             }
           </TouchableOpacity>
         </View>
@@ -100,48 +93,35 @@ export default function AuthScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  inner: { flexGrow: 1, justifyContent: 'center', padding: Spacing.lg },
-  logoArea: { alignItems: 'center', marginBottom: Spacing.xl },
-  logoIcon: {
-    width: 72, height: 72, borderRadius: 20, backgroundColor: Colors.accentLight,
-    alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.md,
+  inner: { flexGrow: 1, justifyContent: 'center', padding: Spacing.md },
+  logoArea: { alignItems: 'center', marginBottom: Spacing.lg },
+  logoText: {
+    fontFamily: 'Montserrat_800ExtraBold',
+    fontSize: 52, color: Colors.accent,
+    letterSpacing: 4, fontStyle: 'italic',
   },
-  logoEmoji: { fontSize: 36 },
-  logoText: { ...Typography.largeTitle, marginBottom: Spacing.xs },
-  tagline: { ...Typography.subhead },
-  card: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
-    padding: Spacing.md,
-  },
+  tagline: { ...Typography.labelMd, color: Colors.textTertiary, marginTop: 8, fontFamily: 'Inter_400Regular' },
+  card: { ...GlassCard, borderRadius: Radius.xl, padding: Spacing.md },
   toggle: {
-    flexDirection: 'row',
-    backgroundColor: Colors.surfaceSecondary,
-    borderRadius: Radius.md,
-    padding: 3,
-    marginBottom: Spacing.md,
+    flexDirection: 'row', backgroundColor: Colors.surfaceHigh,
+    borderRadius: Radius.md, padding: 3, marginBottom: Spacing.md,
   },
   toggleBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: Radius.sm },
-  toggleBtnActive: { backgroundColor: Colors.white, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 2 },
-  toggleText: { ...Typography.subhead, color: Colors.textSecondary },
-  toggleTextActive: { color: Colors.accent, fontWeight: '600' },
+  toggleBtnActive: { backgroundColor: Colors.accent },
+  toggleText: { ...Typography.labelMd, color: Colors.textTertiary },
+  toggleTextActive: { color: Colors.black },
   field: { marginBottom: Spacing.md },
-  label: { ...Typography.caption, marginBottom: Spacing.xs, textTransform: 'uppercase', letterSpacing: 0.5 },
+  fieldLabel: { ...Typography.labelSm, color: Colors.textTertiary, marginBottom: 6 },
   input: {
-    backgroundColor: Colors.white,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: Radius.md,
-    padding: 14,
-    fontSize: 16,
-    color: Colors.text,
+    backgroundColor: Colors.surface,
+    borderBottomWidth: 2, borderBottomColor: Colors.borderVariant,
+    color: Colors.text, fontSize: 16, fontFamily: 'Inter_400Regular',
+    paddingVertical: 10, paddingHorizontal: 4,
   },
   btn: {
-    backgroundColor: Colors.accent,
-    borderRadius: Radius.md,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: Spacing.xs,
+    backgroundColor: Colors.accent, borderRadius: Radius.md,
+    padding: 16, alignItems: 'center', marginTop: 8,
+    ...OrangeGlow,
   },
-  btnText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
+  btnText: { ...Typography.labelMd, color: Colors.black, fontSize: 15 },
 });

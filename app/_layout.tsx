@@ -1,10 +1,11 @@
-import { useFonts } from 'expo-font';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 import { supabase } from '@/src/lib/supabase';
 import { useAuthStore } from '@/src/store/authStore';
+import { useFonts, Montserrat_700Bold, Montserrat_800ExtraBold } from '@expo-google-fonts/montserrat';
+import { Inter_400Regular, Inter_600SemiBold } from '@expo-google-fonts/inter';
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -16,7 +17,10 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
+    Montserrat_700Bold,
+    Montserrat_800ExtraBold,
+    Inter_400Regular,
+    Inter_600SemiBold,
   });
   const { setSession } = useAuthStore();
 
@@ -56,11 +60,11 @@ function RootNavigator() {
   return (
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: '#FFFFFF' },
+        headerStyle: { backgroundColor: '#080808' },
         headerShadowVisible: false,
-        headerTintColor: '#1C1C1E',
-        headerTitleStyle: { fontWeight: '700', fontSize: 17, color: '#1C1C1E' },
-        contentStyle: { backgroundColor: '#FFFFFF' },
+        headerTintColor: '#e5e2e1',
+        headerTitleStyle: { fontFamily: 'Montserrat_700Bold', fontSize: 17, color: '#e5e2e1' },
+        contentStyle: { backgroundColor: '#080808' },
       }}
     >
       <Stack.Screen name="auth" options={{ headerShown: false }} />
