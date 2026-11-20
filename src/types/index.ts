@@ -42,3 +42,9 @@ export interface LoggedSet {
   weight: number;
   completed: boolean;
 }
+
+export interface WeightLog {
+  id: string;
+  date: string; // YYYY-MM-DD
+  weight: number; // kg
+}

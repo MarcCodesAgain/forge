@@ -1,16 +1,25 @@
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, Keyboard } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect } from 'react';
+import { useState } from 'react';
 import { useWorkoutStore } from '@/src/store/workoutStore';
-import { useAuthStore } from '@/src/store/authStore';
+import { localDateKey } from '@/src/store/workoutData';
 import { Colors, Typography, Spacing, Radius, GlassCard, OrangeGlow } from '@/src/theme';
+import { useWeekVolumes, useWeekStreak, useSessionsThisMonth } from '@/src/hooks/useWeekStats';
+import { notify } from '@/src/lib/confirm';
 
 const WEEK_LABELS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 
 function getTodayIndex() {
-  const d = new Date().getDay(); // 0=Sun
+  const d = new Date().getDay();
   return d === 0 ? 6 : d - 1;
+}
+
+function greeting(hour = new Date().getHours()) {
+  if (hour >= 6 && hour < 14) return 'Buenos días';
+  if (hour >= 14 && hour < 21) return 'Buenas tardes';
+  return 'Buenas noches';
 }
 
 function formatDayDate(offset: number) {
@@ -21,12 +30,9 @@ function formatDayDate(offset: number) {
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { plans, logs, loadFromStorage, isLoaded } = useWorkoutStore();
-  const { signOut } = useAuthStore();
-
-  useEffect(() => {
-    if (!isLoaded) loadFromStorage();
-  }, []);
+  const { plans, logs, weightLogs, upsertWeightLog } = useWorkoutStore();
+  // No navigation header on this tab, so keep clear of the notch/status bar.
+  const insets = useSafeAreaInsets();
 
   const todayIdx = getTodayIndex();
 
@@ -34,22 +40,10 @@ export default function HomeScreen() {
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 7);
 
-  const weekVolumes = WEEK_LABELS.map((_, i) => {
-    const dayOffset = i - todayIdx;
-    const targetDate = new Date();
-    targetDate.setDate(targetDate.getDate() + dayOffset);
-    const dateStr = targetDate.toISOString().slice(0, 10);
-    const log = logs.find(l => l.date.slice(0, 10) === dateStr);
-    if (!log) return 0;
-    return log.exercises.reduce((a, ex) =>
-      a + ex.sets.filter(s => s.completed).reduce((s, set) => s + set.weight * set.reps, 0), 0);
-  });
+  const weekVolumes = useWeekVolumes(logs);
   const maxVol = Math.max(...weekVolumes, 1);
-
-  const totalSessions = logs.length;
-  const totalVolume = logs.reduce((a, log) =>
-    a + log.exercises.reduce((b, ex) =>
-      b + ex.sets.filter(s => s.completed).reduce((c, s) => c + s.weight * s.reps, 0), 0), 0);
+  const weekStreak = useWeekStreak(logs);
+  const sessionsThisMonth = useSessionsThisMonth(logs);
 
   // Last workout info
   const lastLog = recentLogs[0];
@@ -60,28 +54,59 @@ export default function HomeScreen() {
 
   // Today's suggested plan/day: next day in the main plan after the last session
   const mainPlan = plans[0];
-  const todayPlan = mainPlan;
-  const todayDay = (() => {
-    if (!mainPlan) return null;
-    if (mainPlan.days.length === 0) return null;
+  const suggestedDay = (() => {
+    if (!mainPlan || mainPlan.days.length === 0) return null;
     if (!lastLog || lastLog.planId !== mainPlan.id) return mainPlan.days[0];
     const lastDayIdx = mainPlan.days.findIndex(d => d.id === lastLog.dayId);
     return mainPlan.days[(lastDayIdx + 1) % mainPlan.days.length];
   })();
 
+  const [selectedDayId, setSelectedDayId] = useState<string | null>(null);
+  const [showDayPicker, setShowDayPicker] = useState(false);
+  const activeDay = mainPlan?.days.find(d => d.id === selectedDayId) ?? suggestedDay;
+
+  // Weight widget
+  const todayStr = localDateKey();
+  const todayWeight = weightLogs.find(w => w.date === todayStr);
+  const [weightInput, setWeightInput] = useState('');
+  const [weightSaving, setWeightSaving] = useState(false);
+  const [weightEditing, setWeightEditing] = useState(false);
+
+  const handleSaveWeight = async () => {
+    const val = parseFloat(weightInput.replace(',', '.'));
+    if (!val || val < 20 || val > 300) return;
+    setWeightSaving(true);
+    const error = await upsertWeightLog(todayStr, val);
+    setWeightSaving(false);
+    if (error) { notify('Error', error); return; }
+    setWeightEditing(false);
+    setWeightInput('');
+    Keyboard.dismiss();
+  };
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[styles.content, { paddingTop: insets.top + Spacing.md }]}
+      showsVerticalScrollIndicator={false}
+    >
 
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.greeting}>Buenos días</Text>
+          <Text style={styles.greeting}>{greeting()}</Text>
           <Text style={styles.subtitle}>
             {hasPlans ? '¿Listo para entrenar hoy?' : 'Empieza creando tu primera rutina'}
           </Text>
         </View>
-        <TouchableOpacity onPress={signOut} hitSlop={12} style={styles.settingsBtn}>
-          <Ionicons name="log-out-outline" size={20} color={Colors.textTertiary} />
+        <TouchableOpacity
+          onPress={() => router.push('/settings')}
+          hitSlop={12}
+          style={styles.settingsBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Ajustes"
+        >
+          <Ionicons name="settings-outline" size={20} color={Colors.textTertiary} />
         </TouchableOpacity>
       </View>
 
@@ -103,6 +128,45 @@ export default function HomeScreen() {
             </View>
           );
         })}
+      </View>
+
+      {/* Weight widget */}
+      <View style={styles.weightCard}>
+        <View style={styles.weightLeft}>
+          <Ionicons name="scale-outline" size={18} color={Colors.blue} />
+          <Text style={styles.weightLabel}>Peso corporal</Text>
+        </View>
+        {todayWeight && !weightEditing ? (
+          <View style={styles.weightRight}>
+            <Text style={styles.weightValue}>{todayWeight.weight}<Text style={styles.weightUnit}> kg</Text></Text>
+            <TouchableOpacity onPress={() => { setWeightInput(String(todayWeight.weight)); setWeightEditing(true); }} hitSlop={8}>
+              <Ionicons name="pencil-outline" size={15} color={Colors.textTertiary} />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.weightInputRow}>
+            <TextInput
+              style={styles.weightInput}
+              keyboardType="decimal-pad"
+              placeholder={todayWeight ? String(todayWeight.weight) : '75.0'}
+              placeholderTextColor={Colors.textTertiary}
+              value={weightInput}
+              onChangeText={setWeightInput}
+              selectTextOnFocus
+              autoFocus={weightEditing}
+              returnKeyType="done"
+              onSubmitEditing={handleSaveWeight}
+            />
+            <Text style={styles.weightUnitStatic}>kg</Text>
+            <TouchableOpacity
+              style={[styles.weightSaveBtn, weightSaving && { opacity: 0.5 }]}
+              onPress={handleSaveWeight}
+              disabled={weightSaving}
+            >
+              <Ionicons name="checkmark" size={16} color={Colors.black} />
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       {/* Onboarding — no plans yet */}
@@ -132,76 +196,84 @@ export default function HomeScreen() {
                 <Ionicons name="flame-outline" size={22} color={Colors.accent} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.todayPlan}>{todayPlan?.name}</Text>
-                <Text style={styles.todayDay}>{todayDay?.name ?? 'Día 1'}</Text>
+                <Text style={styles.todayPlan}>{mainPlan?.name}</Text>
+                <Text style={styles.todayDay}>{activeDay?.name ?? 'Día 1'}</Text>
               </View>
+              {/* Selector discreto */}
+              {(mainPlan?.days.length ?? 0) > 1 && (
+                <TouchableOpacity style={styles.changeDayBtn} onPress={() => setShowDayPicker((p: boolean) => !p)}>
+                  <Ionicons name="swap-vertical-outline" size={14} color={Colors.textTertiary} />
+                  <Text style={styles.changeDayText}>Cambiar</Text>
+                </TouchableOpacity>
+              )}
             </View>
+
+            {/* Day picker inline — solo visible cuando showDayPicker */}
+            {showDayPicker && (
+              <View style={styles.dayPickerRow}>
+                {mainPlan?.days.map(d => {
+                  const isActive = d.id === activeDay?.id;
+                  const isSuggested = d.id === suggestedDay?.id;
+                  return (
+                    <TouchableOpacity
+                      key={d.id}
+                      style={[styles.dayChip, isActive && styles.dayChipActive]}
+                      onPress={() => { setSelectedDayId(d.id); setShowDayPicker(false); }}
+                    >
+                      <Text style={[styles.dayChipText, isActive && styles.dayChipTextActive]}>{d.name}</Text>
+                      {isSuggested && !isActive && <View style={styles.suggestedDot} />}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+
             <View style={styles.todayMeta}>
               <View style={styles.todayMetaItem}>
                 <Ionicons name="list-outline" size={14} color={Colors.textTertiary} />
-                <Text style={styles.todayMetaText}>
-                  {todayDay?.exercises.length ?? 0} ejercicios
-                </Text>
+                <Text style={styles.todayMetaText}>{activeDay?.exercises.length ?? 0} ejercicios</Text>
               </View>
-              {lastLog && (
-                <View style={styles.todayMetaItem}>
-                  <Ionicons name="time-outline" size={14} color={Colors.textTertiary} />
-                  <Text style={styles.todayMetaText}>
-                    Última: {new Date(lastLog.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
-                  </Text>
-                </View>
+              {activeDay?.id !== suggestedDay?.id && (
+                <TouchableOpacity onPress={() => setSelectedDayId(null)} style={styles.todayMetaItem}>
+                  <Ionicons name="refresh-outline" size={13} color={Colors.textTertiary} />
+                  <Text style={[styles.todayMetaText, { color: Colors.textTertiary }]}>Volver al sugerido</Text>
+                </TouchableOpacity>
               )}
             </View>
+
             <TouchableOpacity
               style={[styles.startSessionBtn, OrangeGlow]}
               onPress={() => {
-                if (todayPlan && todayDay) router.push({ pathname: '/session/[planId]/[dayId]', params: { planId: todayPlan.id, dayId: todayDay.id } });
+                if (mainPlan && activeDay) router.push({ pathname: '/session/[planId]/[dayId]', params: { planId: mainPlan.id, dayId: activeDay.id } });
               }}
               activeOpacity={0.85}
             >
               <Ionicons name="play" size={18} color={Colors.black} />
-              <Text style={styles.startSessionText}>Iniciar sesión</Text>
+              <Text style={styles.startSessionText}>Empezar entreno</Text>
             </TouchableOpacity>
           </View>
 
-          {/* Other plans */}
-          {plans.length > 1 && (
-            <>
-              <Text style={styles.sectionLabel}>OTRAS RUTINAS</Text>
-              {plans.slice(1).map(plan => (
-                <TouchableOpacity
-                  key={plan.id}
-                  style={styles.otherPlanCard}
-                  onPress={() => router.push({ pathname: '/plan/[id]', params: { id: plan.id } })}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="barbell-outline" size={18} color={Colors.accent} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.otherPlanName}>{plan.name}</Text>
-                    <Text style={styles.otherPlanMeta}>{plan.days.length} días · {plan.days.reduce((a, d) => a + d.exercises.length, 0)} ejercicios</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
-                </TouchableOpacity>
-              ))}
-            </>
-          )}
         </>
       )}
 
       {/* Stats summary */}
-      {totalSessions > 0 && (
+      {logs.length > 0 && (
         <>
           <Text style={styles.sectionLabel}>TU PROGRESO</Text>
           <View style={styles.statsRow}>
-            <View style={[styles.statCard, { borderLeftColor: Colors.accent }]}>
-              <Text style={styles.statValue}>{totalSessions}</Text>
-              <Text style={styles.statLabel}>Sesiones</Text>
+            <View style={styles.statCard}>
+              <View style={styles.statIconRow}>
+                <Text style={styles.streakEmoji}>{weekStreak >= 3 ? '🔥' : '📅'}</Text>
+              </View>
+              <Text style={styles.statValue}>{weekStreak}</Text>
+              <Text style={styles.statLabel}>{weekStreak === 1 ? 'semana seguida' : 'semanas seguidas'}</Text>
             </View>
-            <View style={[styles.statCard, { borderLeftColor: Colors.blue }]}>
-              <Text style={styles.statValue}>
-                {totalVolume >= 1000 ? `${(totalVolume / 1000).toFixed(1)}k` : totalVolume.toFixed(0)}
-              </Text>
-              <Text style={styles.statLabel}>kg total</Text>
+            <View style={styles.statCard}>
+              <View style={styles.statIconRow}>
+                <Ionicons name="barbell-outline" size={18} color={Colors.blue} />
+              </View>
+              <Text style={styles.statValue}>{sessionsThisMonth}</Text>
+              <Text style={styles.statLabel}>sesiones este mes</Text>
             </View>
           </View>
           {lastLog && lastDay && (
@@ -209,14 +281,14 @@ export default function HomeScreen() {
               <View style={styles.lastLeft}>
                 <Ionicons name="checkmark-circle" size={18} color={Colors.success} />
                 <View>
-                  <Text style={styles.lastTitle}>Última sesión: {lastDay.name}</Text>
+                  <Text style={styles.lastTitle}>Última: {lastDay.name}</Text>
                   <Text style={styles.lastSub}>
                     {new Date(lastLog.date).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
                   </Text>
                 </View>
               </View>
               <TouchableOpacity onPress={() => router.push('/(tabs)/history')}>
-                <Text style={styles.lastLink}>Ver todo</Text>
+                <Text style={styles.lastLink}>Historial</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -288,26 +360,43 @@ const styles = StyleSheet.create({
   todayMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   todayMetaText: { ...Typography.labelSm, color: Colors.textTertiary, fontFamily: 'Inter_400Regular' },
 
+  changeDayBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 10, paddingVertical: 5,
+    borderRadius: Radius.full, borderWidth: 1, borderColor: Colors.borderVariant,
+  },
+  changeDayText: { ...Typography.labelSm, color: Colors.textTertiary },
+
+  dayPickerRow: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: 8,
+    paddingVertical: Spacing.sm,
+    borderTopWidth: 1, borderTopColor: Colors.border,
+  },
+  dayChip: {
+    paddingHorizontal: 12, paddingVertical: 6,
+    borderRadius: Radius.full, borderWidth: 1, borderColor: Colors.borderVariant,
+    backgroundColor: Colors.surface, flexDirection: 'row', alignItems: 'center', gap: 5,
+  },
+  dayChipActive: { backgroundColor: Colors.accent, borderColor: Colors.accent },
+  dayChipText: { ...Typography.labelSm, color: Colors.textSecondary },
+  dayChipTextActive: { color: Colors.black },
+  suggestedDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: Colors.accent },
+
   startSessionBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     backgroundColor: Colors.accent, borderRadius: Radius.lg, padding: 16,
   },
   startSessionText: { fontFamily: 'Montserrat_700Bold', fontSize: 16, color: Colors.black },
 
-  otherPlanCard: {
-    flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
-    ...GlassCard, borderRadius: Radius.lg, padding: Spacing.md,
-  },
-  otherPlanName: { ...Typography.labelMd, color: Colors.text },
-  otherPlanMeta: { ...Typography.labelSm, color: Colors.textTertiary, marginTop: 2, fontFamily: 'Inter_400Regular' },
-
   statsRow: { flexDirection: 'row', gap: 10 },
   statCard: {
     ...GlassCard, flex: 1, borderRadius: Radius.lg,
-    padding: Spacing.md, borderLeftWidth: 3,
+    padding: Spacing.md, gap: 2,
   },
-  statValue: { fontFamily: 'Montserrat_700Bold', fontSize: 26, color: Colors.text },
-  statLabel: { ...Typography.labelSm, color: Colors.textTertiary, marginTop: 2 },
+  statIconRow: { marginBottom: 4 },
+  streakEmoji: { fontSize: 18 },
+  statValue: { fontFamily: 'Montserrat_700Bold', fontSize: 28, color: Colors.text },
+  statLabel: { ...Typography.labelSm, color: Colors.textTertiary, marginTop: 1 },
 
   lastCard: {
     ...GlassCard, borderRadius: Radius.lg, padding: Spacing.md,
@@ -317,4 +406,26 @@ const styles = StyleSheet.create({
   lastTitle: { ...Typography.labelMd, color: Colors.text },
   lastSub: { ...Typography.labelSm, color: Colors.textTertiary, fontFamily: 'Inter_400Regular', marginTop: 2, textTransform: 'capitalize' },
   lastLink: { ...Typography.labelSm, color: Colors.accent },
+
+  weightCard: {
+    ...GlassCard, borderRadius: Radius.lg, padding: Spacing.md,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+  },
+  weightLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  weightLabel: { ...Typography.labelMd, color: Colors.textSecondary },
+  weightRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  weightValue: { fontFamily: 'Montserrat_700Bold', fontSize: 20, color: Colors.text },
+  weightUnit: { fontSize: 13, fontFamily: 'Inter_400Regular', color: Colors.textTertiary },
+  weightInputRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  weightInput: {
+    width: 64, height: 36, backgroundColor: Colors.surface,
+    borderRadius: Radius.sm, borderWidth: 1, borderColor: Colors.borderVariant,
+    color: Colors.text, fontFamily: 'Montserrat_700Bold', fontSize: 16,
+    textAlign: 'center', paddingHorizontal: 4,
+  },
+  weightUnitStatic: { ...Typography.labelSm, color: Colors.textTertiary },
+  weightSaveBtn: {
+    width: 36, height: 36, borderRadius: Radius.sm,
+    backgroundColor: Colors.accent, alignItems: 'center', justifyContent: 'center',
+  },
 });

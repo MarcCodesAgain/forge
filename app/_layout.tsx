@@ -1,11 +1,14 @@
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
-import { supabase } from '@/src/lib/supabase';
-import { useAuthStore } from '@/src/store/authStore';
-import { useFonts, Montserrat_700Bold, Montserrat_800ExtraBold } from '@expo-google-fonts/montserrat';
-import { Inter_400Regular, Inter_600SemiBold } from '@expo-google-fonts/inter';
+import { useWorkoutStore } from '@/src/store/workoutStore';
+import { useFonts } from 'expo-font';
+// Per-weight imports: the packages' index pulls in every weight and italic.
+import { Montserrat_700Bold } from '@expo-google-fonts/montserrat/700Bold';
+import { Montserrat_800ExtraBold } from '@expo-google-fonts/montserrat/800ExtraBold';
+import { Inter_400Regular } from '@expo-google-fonts/inter/400Regular';
+import { Inter_600SemiBold } from '@expo-google-fonts/inter/600SemiBold';
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -22,41 +25,26 @@ export default function RootLayout() {
     Inter_400Regular,
     Inter_600SemiBold,
   });
-  const { setSession } = useAuthStore();
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-    return () => subscription.unsubscribe();
-  }, []);
+  // Saved workouts load from the device asynchronously; keep the splash up
+  // until they're in so screens never flash an empty state.
+  const hasHydrated = useWorkoutStore((s) => s.hasHydrated);
 
   useEffect(() => {
     if (error) throw error;
   }, [error]);
 
-  useEffect(() => {
-    if (loaded) SplashScreen.hideAsync();
-  }, [loaded]);
+  const ready = loaded && hasHydrated;
 
-  if (!loaded) return null;
+  useEffect(() => {
+    if (ready) SplashScreen.hideAsync();
+  }, [ready]);
+
+  if (!ready) return null;
 
   return <RootNavigator />;
 }
 
 function RootNavigator() {
-  const { session, isLoading } = useAuthStore();
-  const segments = useSegments();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (isLoading) return;
-    const inAuth = segments[0] === 'auth';
-    if (!session && !inAuth) router.replace('/auth');
-    else if (session && inAuth) router.replace('/');
-  }, [session, isLoading]);
-
   return (
     <Stack
       screenOptions={{
@@ -67,11 +55,13 @@ function RootNavigator() {
         contentStyle: { backgroundColor: '#080808' },
       }}
     >
-      <Stack.Screen name="auth" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="plan/new" options={{ title: 'Nueva rutina', presentation: 'modal' }} />
-      <Stack.Screen name="plan/[id]" options={{ title: 'Editar rutina' }} />
+      <Stack.Screen name="plan/edit/[id]" options={{ title: 'Editar rutina' }} />
       <Stack.Screen name="session/[planId]/[dayId]/index" options={{ title: 'Entrenamiento' }} />
+      <Stack.Screen name="log/[logId]" options={{ title: 'Detalle sesión' }} />
+      <Stack.Screen name="settings" options={{ title: 'Ajustes' }} />
+      <Stack.Screen name="privacy" options={{ title: 'Privacidad' }} />
     </Stack>
   );
 }

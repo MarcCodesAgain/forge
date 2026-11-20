@@ -1,27 +1,33 @@
 {
   "expo": {
-    "name": "fitjournal",
-    "slug": "fitjournal",
+    "name": "Forge",
+    "slug": "forge-fitness",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "fitjournal",
-    "userInterfaceStyle": "automatic",
+    "scheme": "forge",
+    "userInterfaceStyle": "dark",
     "ios": {
-      "supportsTablet": true
+      "bundleIdentifier": "com.marcllopis.forge",
+      "supportsTablet": false,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "buildNumber": "1"
     },
     "android": {
+      "package": "com.marcllopis.forge",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#080808",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "versionCode": 1
     },
     "web": {
       "bundler": "metro",
-      "output": "static",
+      "output": "single",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
@@ -31,14 +37,21 @@
         {
           "image": "./assets/images/splash-icon.png",
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "backgroundColor": "#080808"
         }
       ],
-      "expo-secure-store",
-      "expo-font"
+      "expo-font",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "be729b30-3fae-4b6c-a0bf-0910f686111b"
+      },
+      "router": {}
+    },
+    "description": "Registra tus entrenos de gimnasio: rutinas, series, pesos, progreso. Sin cuenta, todo en tu móvil."
   }
 }

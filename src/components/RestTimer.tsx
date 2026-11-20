@@ -45,8 +45,9 @@ export default function RestTimer({ seconds, onDone, onSkip }: Props) {
               strokeDasharray={circumference}
               strokeDashoffset={strokeDashoffset}
               strokeLinecap="round"
-              rotation={-90}
-              origin="56, 56"
+              // Start the ring at 12 o'clock. A plain SVG transform works on
+              // native and web; rotation/origin props emit an invalid DOM attribute on web.
+              transform="rotate(-90 56 56)"
             />
           </Svg>
           <View style={styles.timerInside}>

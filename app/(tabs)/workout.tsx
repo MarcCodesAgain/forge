@@ -3,10 +3,23 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useWorkoutStore } from '@/src/store/workoutStore';
 import { Colors, Typography, Spacing, Radius, GlassCard } from '@/src/theme';
+import { confirm, notify } from '@/src/lib/confirm';
 
 export default function WorkoutScreen() {
   const router = useRouter();
-  const { plans } = useWorkoutStore();
+  const { plans, deletePlan } = useWorkoutStore();
+
+  const handleDelete = async (planId: string, planName: string) => {
+    const ok = await confirm(
+      'Eliminar rutina',
+      `¿Eliminar "${planName}"? Tu historial de entrenos se conserva.`,
+      'Eliminar',
+      true,
+    );
+    if (!ok) return;
+    const error = await deletePlan(planId);
+    if (error) notify('Error al eliminar', error);
+  };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -27,8 +40,28 @@ export default function WorkoutScreen() {
       ) : (
         plans.map((plan) => (
           <View key={plan.id} style={styles.planCard}>
-            <Text style={styles.planLabel}>RUTINA</Text>
-            <Text style={styles.planName}>{plan.name}</Text>
+            <View style={styles.planCardHeader}>
+              <View>
+                <Text style={styles.planLabel}>RUTINA</Text>
+                <Text style={styles.planName}>{plan.name}</Text>
+              </View>
+              <View style={styles.planActions}>
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  onPress={() => router.push({ pathname: '/plan/edit/[id]', params: { id: plan.id } })}
+                  hitSlop={8}
+                >
+                  <Ionicons name="pencil-outline" size={17} color={Colors.textSecondary} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  onPress={() => handleDelete(plan.id, plan.name)}
+                  hitSlop={8}
+                >
+                  <Ionicons name="trash-outline" size={17} color={Colors.error} />
+                </TouchableOpacity>
+              </View>
+            </View>
             <View style={styles.divider} />
             {plan.days.map((day) => (
               <TouchableOpacity
@@ -80,8 +113,14 @@ const styles = StyleSheet.create({
   emptySub: { ...Typography.labelMd, color: Colors.textTertiary, fontFamily: 'Inter_400Regular', textAlign: 'center' },
 
   planCard: { ...GlassCard, borderRadius: Radius.lg, padding: Spacing.md, marginBottom: 14 },
+  planCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: Spacing.sm },
   planLabel: { ...Typography.labelSm, color: Colors.textTertiary, textTransform: 'uppercase', marginBottom: 4 },
-  planName: { ...Typography.headlineSm, color: Colors.text, marginBottom: Spacing.sm },
+  planName: { ...Typography.headlineSm, color: Colors.text },
+  planActions: { flexDirection: 'row', gap: 4 },
+  actionBtn: {
+    width: 34, height: 34, borderRadius: Radius.sm,
+    backgroundColor: Colors.surfaceHigh, alignItems: 'center', justifyContent: 'center',
+  },
   divider: { height: 1, backgroundColor: Colors.border, marginBottom: Spacing.xs },
 
   dayRow: {

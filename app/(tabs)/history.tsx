@@ -1,14 +1,18 @@
 import { useState, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, FlatList, Modal, SafeAreaView } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useWorkoutStore } from '@/src/store/workoutStore';
 import { Colors, Typography, Spacing, Radius, GlassCard } from '@/src/theme';
 import ProgressChart from '@/src/components/ProgressChart';
+import { usePRs, useActivePlanExercises, useAllExerciseNames } from '@/src/hooks/usePerformanceStats';
 
 export default function HistoryScreen() {
-  const { logs, plans } = useWorkoutStore();
+  const router = useRouter();
+  const { logs, plans, weightLogs } = useWorkoutStore();
   const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
   const [showExPicker, setShowExPicker] = useState(false);
+  const [sessionLimit, setSessionLimit] = useState(5);
 
   const sorted = useMemo(() =>
     [...logs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
@@ -33,14 +37,10 @@ export default function HistoryScreen() {
     log.exercises.reduce((a, ex) =>
       a + ex.sets.filter(s => s.completed).reduce((s, set) => s + set.weight * set.reps, 0), 0);
 
-  // All unique exercise names across all logs
-  const allExercises = useMemo(() => {
-    const names = new Set<string>();
-    logs.forEach(l => l.exercises.forEach(e => names.add(e.exerciseName)));
-    return [...names].sort();
-  }, [logs]);
+  const allExercises = useAllExerciseNames(logs);
+  const activePlanExercises = useActivePlanExercises(plans, allExercises);
+  const prs = usePRs(logs);
 
-  // Chart data for selected exercise: max weight per session
   const chartData = useMemo(() => {
     if (!selectedExercise) return [];
     return sorted
@@ -57,11 +57,16 @@ export default function HistoryScreen() {
   }, [selectedExercise, logs]);
 
   const totalSessions = sorted.length;
-  const totalVol = sorted.reduce((a, l) => a + totalVolume(l), 0);
+
+  const weightChartData = useMemo(() =>
+    [...weightLogs]
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map(w => ({ date: w.date, value: w.weight }))
+  , [weightLogs]);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-      <Text style={styles.pageTitle}>Performance</Text>
+      <Text style={styles.pageTitle}>Tu progreso</Text>
 
       {sorted.length === 0 ? (
         <View style={styles.empty}>
@@ -77,19 +82,53 @@ export default function HistoryScreen() {
               <Text style={styles.statValue}>{totalSessions}</Text>
               <Text style={styles.statLabel}>Sesiones</Text>
             </View>
-            <View style={[styles.statCard, { borderLeftWidth: 3, borderLeftColor: Colors.blue }]}>
-              <Text style={styles.statValue}>
-                {totalVol >= 1000 ? `${(totalVol / 1000).toFixed(1)}k` : totalVol.toFixed(0)}
-              </Text>
-              <Text style={styles.statLabel}>kg total</Text>
-            </View>
             <View style={[styles.statCard, { borderLeftWidth: 3, borderLeftColor: Colors.success }]}>
               <Text style={styles.statValue}>{allExercises.length}</Text>
               <Text style={styles.statLabel}>Ejercicios</Text>
             </View>
           </View>
 
-          {/* Progress chart section */}
+          {/* PRs */}
+          {prs.length > 0 && (
+            <>
+              <Text style={styles.sectionLabel}>🏆 RECORDS PERSONALES</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.prRow}>
+                {prs.map(pr => (
+                  <View key={pr.name} style={styles.prCard}>
+                    <Text style={styles.prExName} numberOfLines={1}>{pr.name}</Text>
+                    <Text style={styles.prWeight}>{pr.weight}<Text style={styles.prUnit}> kg</Text></Text>
+                    <Text style={styles.prDate}>{formatDate(pr.date)}</Text>
+                  </View>
+                ))}
+              </ScrollView>
+            </>
+          )}
+
+          {/* Body weight chart */}
+          <View style={styles.chartCard}>
+            <View style={styles.chartHeader}>
+              <Text style={styles.chartTitle}>PESO CORPORAL</Text>
+              {weightLogs.length > 0 && (
+                <Text style={styles.weightLatest}>
+                  {weightLogs[0].weight} kg
+                </Text>
+              )}
+            </View>
+            {weightChartData.length < 2 ? (
+              <View style={styles.chartEmpty}>
+                <Ionicons name="scale-outline" size={28} color={Colors.textTertiary} />
+                <Text style={styles.chartEmptyText}>
+                  {weightChartData.length === 0
+                    ? 'Registra tu peso en Inicio para ver tu evolución aquí'
+                    : 'Registra tu peso al menos 2 días para ver la gráfica'}
+                </Text>
+              </View>
+            ) : (
+              <ProgressChart data={weightChartData} label="Peso" unit=" kg" />
+            )}
+          </View>
+
+          {/* Progress chart */}
           <View style={styles.chartCard}>
             <View style={styles.chartHeader}>
               <Text style={styles.chartTitle}>PROGRESIÓN DE PESO</Text>
@@ -117,12 +156,17 @@ export default function HistoryScreen() {
 
           {/* Session List */}
           <Text style={styles.sectionLabel}>HISTORIAL DE SESIONES</Text>
-          {sorted.map((log) => {
+          {sorted.slice(0, sessionLimit).map((log) => {
             const { dayName } = getPlanAndDay(log.planId, log.dayId);
             const vol = totalVolume(log);
             const completed = log.exercises.reduce((a, ex) => a + ex.sets.filter(s => s.completed).length, 0);
             return (
-              <View key={log.id} style={styles.sessionCard}>
+              <TouchableOpacity
+                key={log.id}
+                style={styles.sessionCard}
+                onPress={() => router.push({ pathname: '/log/[logId]', params: { logId: log.id } })}
+                activeOpacity={0.75}
+              >
                 <View style={styles.sessionIcon}>
                   <Ionicons name="barbell-outline" size={20} color={Colors.blue} />
                 </View>
@@ -132,14 +176,22 @@ export default function HistoryScreen() {
                     {completed} series{vol > 0 ? ` · ${vol.toFixed(0)} kg` : ''}
                   </Text>
                 </View>
-                <Text style={styles.sessionDate}>{formatDate(log.date)}</Text>
-              </View>
+                <View style={styles.sessionRight}>
+                  <Text style={styles.sessionDate}>{formatDate(log.date)}</Text>
+                  <Ionicons name="chevron-forward" size={14} color={Colors.textTertiary} />
+                </View>
+              </TouchableOpacity>
             );
           })}
+          {sorted.length > sessionLimit && (
+            <TouchableOpacity style={styles.showMoreBtn} onPress={() => setSessionLimit(l => l + 10)}>
+              <Text style={styles.showMoreText}>Ver más ({sorted.length - sessionLimit} sesiones)</Text>
+              <Ionicons name="chevron-down" size={14} color={Colors.accent} />
+            </TouchableOpacity>
+          )}
         </>
       )}
 
-      {/* Exercise picker modal */}
       <Modal visible={showExPicker} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowExPicker(false)}>
         <SafeAreaView style={styles.modal}>
           <View style={styles.modalHeader}>
@@ -149,12 +201,12 @@ export default function HistoryScreen() {
             </TouchableOpacity>
           </View>
           <FlatList
-            data={allExercises}
+            data={activePlanExercises}
             keyExtractor={e => e}
             contentContainerStyle={{ paddingHorizontal: Spacing.md, paddingBottom: 40 }}
             renderItem={({ item }) => (
               <TouchableOpacity
-                style={[styles.exRow, selectedExercise === item && styles.exRowActive]}
+                style={styles.exRow}
                 onPress={() => { setSelectedExercise(item); setShowExPicker(false); }}
               >
                 <Text style={[styles.exRowText, selectedExercise === item && styles.exRowTextActive]}>{item}</Text>
@@ -182,6 +234,18 @@ const styles = StyleSheet.create({
   statValue: { fontFamily: 'Montserrat_700Bold', fontSize: 24, color: Colors.text },
   statLabel: { ...Typography.labelSm, color: Colors.textTertiary, marginTop: 4 },
 
+  sectionLabel: { ...Typography.labelSm, color: Colors.textTertiary, textTransform: 'uppercase' },
+
+  prRow: { gap: 10, paddingBottom: 4 },
+  prCard: {
+    ...GlassCard, borderRadius: Radius.lg, padding: Spacing.md,
+    minWidth: 120, borderLeftWidth: 3, borderLeftColor: Colors.accent, gap: 2,
+  },
+  prExName: { ...Typography.labelSm, color: Colors.textTertiary, textTransform: 'capitalize', marginBottom: 4 },
+  prWeight: { fontFamily: 'Montserrat_700Bold', fontSize: 22, color: Colors.accent },
+  prUnit: { fontSize: 13, color: Colors.textTertiary },
+  prDate: { ...Typography.labelSm, color: Colors.textTertiary, marginTop: 2 },
+
   chartCard: { ...GlassCard, borderRadius: Radius.lg, padding: Spacing.md, gap: Spacing.md },
   chartHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   chartTitle: { ...Typography.labelSm, color: Colors.textTertiary, textTransform: 'uppercase', letterSpacing: 1 },
@@ -193,8 +257,8 @@ const styles = StyleSheet.create({
   exSelectorText: { ...Typography.labelSm, color: Colors.accent, flex: 1 },
   chartEmpty: { alignItems: 'center', paddingVertical: Spacing.lg, gap: 8 },
   chartEmptyText: { ...Typography.labelMd, color: Colors.textTertiary, fontFamily: 'Inter_400Regular', textAlign: 'center' },
-
-  sectionLabel: { ...Typography.labelSm, color: Colors.textTertiary, textTransform: 'uppercase' },
+  weightLatest: { fontFamily: 'Montserrat_700Bold', fontSize: 16, color: Colors.text },
+  weightLatestSub: { fontSize: 12, fontFamily: 'Inter_400Regular', color: Colors.textTertiary },
 
   sessionCard: {
     ...GlassCard, borderRadius: Radius.lg,
@@ -208,6 +272,7 @@ const styles = StyleSheet.create({
   sessionInfo: { flex: 1 },
   sessionDay: { ...Typography.labelMd, color: Colors.text },
   sessionDetail: { ...Typography.labelSm, color: Colors.textTertiary, marginTop: 2 },
+  sessionRight: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   sessionDate: { ...Typography.labelSm, color: Colors.textTertiary },
 
   modal: { flex: 1, backgroundColor: Colors.background },
@@ -220,7 +285,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border,
   },
-  exRowActive: { },
   exRowText: { ...Typography.labelMd, color: Colors.text, fontFamily: 'Inter_400Regular' },
   exRowTextActive: { color: Colors.accent, fontFamily: 'Inter_600SemiBold' },
+
+  showMoreBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    paddingVertical: 14, borderWidth: 1, borderColor: Colors.borderVariant,
+    borderRadius: Radius.lg, backgroundColor: Colors.surface,
+  },
+  showMoreText: { ...Typography.labelMd, color: Colors.accent },
 });

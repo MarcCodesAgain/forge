@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useWorkoutStore } from '@/src/store/workoutStore';
@@ -7,6 +7,7 @@ import { generateId } from '@/src/lib/uuid';
 import type { WorkoutDay } from '@/src/types';
 import { Colors, Typography, Spacing, Radius, GlassCard, OrangeGlow } from '@/src/theme';
 import ExercisePicker from '@/src/components/ExercisePicker';
+import { notify } from '@/src/lib/confirm';
 
 export default function NewPlanScreen() {
   const router = useRouter();
@@ -64,11 +65,12 @@ export default function NewPlanScreen() {
       : d));
 
   const handleSave = async () => {
-    if (!planName.trim()) { Alert.alert('Error', 'Añade un nombre a la rutina'); return; }
-    if (days.length === 0) { Alert.alert('Error', 'Añade al menos un día'); return; }
+    if (!planName.trim()) { notify('Error', 'Añade un nombre a la rutina'); return; }
+    if (days.length === 0) { notify('Error', 'Añade al menos un día'); return; }
     setSaving(true);
-    await addPlan({ id: generateId(), name: planName.trim(), days, createdAt: new Date().toISOString() });
+    const error = await addPlan({ id: generateId(), name: planName.trim(), days, createdAt: new Date().toISOString() });
     setSaving(false);
+    if (error) { notify('Error al guardar', error); return; }
     router.back();
   };
 
@@ -121,9 +123,9 @@ export default function NewPlanScreen() {
                 />
 
                 <View style={styles.setHeaderRow}>
-                  <Text style={[styles.colHead, { width: 32 }]}>#</Text>
-                  <Text style={[styles.colHead, { flex: 1 }]}>kg</Text>
-                  <Text style={[styles.colHead, { flex: 1 }]}>reps</Text>
+                  <Text style={[styles.colHead, { width: 28 }]}>#</Text>
+                  <Text style={[styles.colHead, { width: 72 }]}>kg</Text>
+                  <Text style={[styles.colHead, { width: 72 }]}>reps</Text>
                   <View style={{ width: 28 }} />
                 </View>
 
@@ -231,14 +233,16 @@ const styles = StyleSheet.create({
     paddingVertical: 6, marginBottom: Spacing.sm,
   },
   setHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
-  colHead: { ...Typography.labelSm, color: Colors.textTertiary, textAlign: 'center', textTransform: 'uppercase' },
+  colHead: { fontSize: 10, fontFamily: 'Inter_600SemiBold', color: Colors.textTertiary, textAlign: 'center', textTransform: 'uppercase', letterSpacing: 0.5 },
   setRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
-  setNum: { width: 32, ...Typography.labelSm, color: Colors.textTertiary, textAlign: 'center' },
+  setNum: { width: 24, ...Typography.labelSm, color: Colors.textTertiary, textAlign: 'center' },
   setInput: {
-    flex: 1, backgroundColor: Colors.surface,
-    borderBottomWidth: 2, borderBottomColor: Colors.borderVariant,
-    color: Colors.text, fontSize: 15, fontFamily: 'Inter_600SemiBold',
-    paddingVertical: 6, textAlign: 'center',
+    width: 72, backgroundColor: Colors.surface,
+    borderRadius: 6,
+    borderWidth: 1, borderColor: Colors.borderVariant,
+    color: Colors.text, fontSize: 13, fontFamily: 'Inter_600SemiBold',
+    paddingVertical: 5, paddingHorizontal: 4, textAlign: 'center',
+    height: 34,
   },
   addSetBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: Spacing.sm, alignSelf: 'flex-start' },
   addSetText: { ...Typography.labelSm, color: Colors.accent },

@@ -75,6 +75,9 @@ export default function ExercisePicker({ visible, onSelect, onClose }: Props) {
           data={MUSCLES}
           keyExtractor={m => m}
           showsHorizontalScrollIndicator={false}
+          // Without this the horizontal list competes with the results list
+          // for height and the chips get clipped.
+          style={styles.chipsList}
           contentContainerStyle={styles.chips}
           renderItem={({ item: m }) => (
             <TouchableOpacity
@@ -138,6 +141,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md, paddingVertical: 10,
   },
   searchInput: { flex: 1, ...Typography.bodyMd, color: Colors.text, fontFamily: 'Inter_400Regular' },
+  chipsList: { flexGrow: 0, flexShrink: 0 },
   chips: { paddingHorizontal: Spacing.md, paddingBottom: Spacing.sm, gap: 8 },
   chip: {
     paddingHorizontal: 14, paddingVertical: 6,

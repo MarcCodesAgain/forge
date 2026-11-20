@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { useState, useMemo } from 'react';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useWorkoutStore } from '@/src/store/workoutStore';
@@ -7,17 +7,17 @@ import { generateId } from '@/src/lib/uuid';
 import type { LoggedSet } from '@/src/types';
 import { Colors, Typography, Spacing, Radius, GlassCard, OrangeGlow } from '@/src/theme';
 import RestTimer from '@/src/components/RestTimer';
+import { usePrevSets } from '@/src/hooks/usePrevSets';
+import { confirm, notify } from '@/src/lib/confirm';
 
 const REST_SECONDS = 90;
 
 export default function SessionScreen() {
   const { planId, dayId } = useLocalSearchParams<{ planId: string; dayId: string }>();
   const router = useRouter();
-  const { plans, addLog } = useWorkoutStore();
+  const { plans, logs, addLog } = useWorkoutStore();
   const [saving, setSaving] = useState(false);
-  const [elapsed, setElapsed] = useState(0);
   const [showRest, setShowRest] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const plan = plans.find(p => p.id === planId);
   const day = plan?.days.find(d => d.id === dayId);
@@ -32,16 +32,7 @@ export default function SessionScreen() {
 
   const [exercises, setExercises] = useState(initial);
 
-  useEffect(() => {
-    timerRef.current = setInterval(() => setElapsed(e => e + 1), 1000);
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, []);
-
-  const formatTime = (s: number) => {
-    const m = Math.floor(s / 60);
-    const sec = s % 60;
-    return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
-  };
+  const prevSetsMap = usePrevSets(logs, day);
 
   if (!plan || !day) return (
     <View style={styles.center}>
@@ -69,14 +60,16 @@ export default function SessionScreen() {
   };
 
   const handleFinish = async () => {
-    if (timerRef.current) clearInterval(timerRef.current);
     setSaving(true);
-    await addLog({ id: generateId(), planId, dayId, date: new Date().toISOString(), exercises });
+    const error = await addLog({ id: generateId(), planId, dayId, date: new Date().toISOString(), exercises });
     setSaving(false);
-    Alert.alert('¡Entreno guardado!', `${completedCount} series · ${formatTime(elapsed)}`, [
-      { text: 'Ver historial', onPress: () => router.replace('/(tabs)/history') },
-      { text: 'OK', onPress: () => router.back() },
-    ]);
+    if (error) {
+      notify('Error al guardar', error);
+      return;
+    }
+    const seeHistory = await confirm('¡Entreno guardado!', `${completedCount} ${completedCount === 1 ? 'serie completada' : 'series completadas'}.`, 'Ver historial');
+    if (seeHistory) router.replace('/(tabs)/history');
+    else router.back();
   };
 
   return (
@@ -91,26 +84,34 @@ export default function SessionScreen() {
         <View style={styles.sessionHeader}>
           <View>
             <Text style={styles.sessionActive}>SESIÓN ACTIVA</Text>
-            <Text style={styles.timer}>{formatTime(elapsed)}</Text>
-          </View>
-          <View style={styles.sessionMeta}>
             <Text style={styles.dayName}>{day.name}</Text>
             <Text style={styles.planName}>{plan.name}</Text>
-            <View style={styles.seriesBadge}>
-              <Text style={styles.setsCount}>{completedCount}/{totalCount} series</Text>
-            </View>
+          </View>
+          <View style={styles.seriesBadge}>
+            <Text style={styles.setsCount}>{completedCount}/{totalCount} series</Text>
           </View>
         </View>
 
         {/* Exercise cards */}
         {exercises.map((ex, ei) => {
           const allDone = ex.sets.every(s => s.completed);
+          const prev = prevSetsMap.get(ex.exerciseName);
           return (
             <View key={ex.exerciseId} style={[styles.exCard, allDone && styles.exCardDone]}>
               <View style={styles.exHeader}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.exName}>{ex.exerciseName || `Ejercicio ${ei + 1}`}</Text>
-                  <Text style={styles.exSub}>{ex.sets.length} sets</Text>
+                  {prev ? (
+                    <Text style={styles.prevHint}>
+                      Anterior ({new Date(prev.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}){': '}
+                      {prev.sets.slice(0, 3).map((s, i) =>
+                        `${s.weight > 0 ? s.weight + 'kg' : '—'} × ${s.reps}`
+                      ).join('  ·  ')}
+                      {prev.sets.length > 3 ? ` +${prev.sets.length - 3}` : ''}
+                    </Text>
+                  ) : (
+                    <Text style={styles.exSub}>{ex.sets.length} sets · sin datos anteriores</Text>
+                  )}
                 </View>
                 {allDone
                   ? <View style={styles.doneBadge}><Text style={styles.doneBadgeText}>✓ Hecho</Text></View>
@@ -126,56 +127,66 @@ export default function SessionScreen() {
                 <View style={{ width: 72 }} />
               </View>
 
-              {ex.sets.map((set, si) => (
-                <TouchableOpacity
-                  key={si}
-                  style={[styles.setRow, set.completed && styles.setRowDone]}
-                  onPress={() => toggleSet(ei, si)}
-                  activeOpacity={0.75}
-                >
-                  <Text style={[styles.setNum, set.completed && styles.setNumDone]}>{si + 1}</Text>
-
+              {ex.sets.map((set, si) => {
+                const prevSet = prev?.sets[si];
+                return (
                   <TouchableOpacity
-                    style={[styles.inputWrap, set.completed && styles.inputWrapDone]}
-                    onPress={e => e.stopPropagation?.()}
-                    activeOpacity={1}
+                    key={si}
+                    style={[styles.setRow, set.completed && styles.setRowDone]}
+                    onPress={() => toggleSet(ei, si)}
+                    activeOpacity={0.75}
                   >
-                    <TextInput
-                      style={[styles.setInput, set.completed && styles.setInputDone]}
-                      keyboardType="decimal-pad"
-                      value={String(set.weight)}
-                      onChangeText={v => updateField(ei, si, 'weight', v)}
-                      editable={!set.completed}
-                      selectTextOnFocus
-                    />
-                    <Text style={styles.inputUnit}>kg</Text>
-                  </TouchableOpacity>
+                    <View style={{ width: 48, alignItems: 'center' }}>
+                      <Text style={[styles.setNum, set.completed && styles.setNumDone]}>{si + 1}</Text>
+                      {prevSet && (
+                        <Text style={styles.prevSetHint}>
+                          {prevSet.weight > 0 ? `${prevSet.weight}×${prevSet.reps}` : `${prevSet.reps}r`}
+                        </Text>
+                      )}
+                    </View>
 
-                  <TouchableOpacity
-                    style={[styles.inputWrap, set.completed && styles.inputWrapDone]}
-                    onPress={e => e.stopPropagation?.()}
-                    activeOpacity={1}
-                  >
-                    <TextInput
-                      style={[styles.setInput, set.completed && styles.setInputDone]}
-                      keyboardType="numeric"
-                      value={String(set.reps)}
-                      onChangeText={v => updateField(ei, si, 'reps', v)}
-                      editable={!set.completed}
-                      selectTextOnFocus
-                    />
-                    <Text style={styles.inputUnit}>reps</Text>
-                  </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.inputWrap, set.completed && styles.inputWrapDone]}
+                      onPress={e => e.stopPropagation?.()}
+                      activeOpacity={1}
+                    >
+                      <TextInput
+                        style={[styles.setInput, set.completed && styles.setInputDone]}
+                        keyboardType="decimal-pad"
+                        value={String(set.weight)}
+                        onChangeText={v => updateField(ei, si, 'weight', v)}
+                        editable={!set.completed}
+                        selectTextOnFocus
+                      />
+                      <Text style={styles.inputUnit}>kg</Text>
+                    </TouchableOpacity>
 
-                  <View style={styles.checkArea}>
-                    <Ionicons
-                      name={set.completed ? 'checkmark-circle' : 'ellipse-outline'}
-                      size={32}
-                      color={set.completed ? Colors.success : Colors.borderVariant}
-                    />
-                  </View>
-                </TouchableOpacity>
-              ))}
+                    <TouchableOpacity
+                      style={[styles.inputWrap, set.completed && styles.inputWrapDone]}
+                      onPress={e => e.stopPropagation?.()}
+                      activeOpacity={1}
+                    >
+                      <TextInput
+                        style={[styles.setInput, set.completed && styles.setInputDone]}
+                        keyboardType="numeric"
+                        value={String(set.reps)}
+                        onChangeText={v => updateField(ei, si, 'reps', v)}
+                        editable={!set.completed}
+                        selectTextOnFocus
+                      />
+                      <Text style={styles.inputUnit}>reps</Text>
+                    </TouchableOpacity>
+
+                    <View style={styles.checkArea}>
+                      <Ionicons
+                        name={set.completed ? 'checkmark-circle' : 'ellipse-outline'}
+                        size={32}
+                        color={set.completed ? Colors.success : Colors.borderVariant}
+                      />
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           );
         })}
@@ -216,11 +227,9 @@ const styles = StyleSheet.create({
   sessionHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
   },
-  sessionActive: { ...Typography.labelSm, color: Colors.accent, textTransform: 'uppercase', letterSpacing: 2 },
-  timer: { fontFamily: 'Montserrat_700Bold', fontSize: 40, color: Colors.accent, lineHeight: 48 },
-  sessionMeta: { alignItems: 'flex-end', gap: 4 },
-  dayName: { fontFamily: 'Montserrat_700Bold', fontSize: 16, color: Colors.text },
-  planName: { ...Typography.labelSm, color: Colors.textTertiary },
+  sessionActive: { ...Typography.labelSm, color: Colors.accent, textTransform: 'uppercase', letterSpacing: 2, marginBottom: 4 },
+  dayName: { fontFamily: 'Montserrat_700Bold', fontSize: 22, color: Colors.text },
+  planName: { ...Typography.labelSm, color: Colors.textTertiary, marginTop: 2 },
   seriesBadge: {
     backgroundColor: `${Colors.success}20`, borderRadius: Radius.full,
     paddingHorizontal: 10, paddingVertical: 3,
@@ -235,6 +244,8 @@ const styles = StyleSheet.create({
   },
   exName: { fontFamily: 'Montserrat_700Bold', fontSize: 17, color: Colors.text },
   exSub: { ...Typography.labelSm, color: Colors.textTertiary, marginTop: 2 },
+  prevHint: { fontSize: 11, fontFamily: 'Inter_400Regular', color: Colors.textTertiary, marginTop: 3 },
+  prevSetHint: { fontSize: 10, fontFamily: 'Inter_400Regular', color: Colors.textTertiary, marginTop: 1 },
   doneBadge: {
     backgroundColor: `${Colors.success}20`, borderRadius: Radius.full,
     paddingHorizontal: 10, paddingVertical: 4,
