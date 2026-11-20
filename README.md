@@ -2,7 +2,9 @@
 
 Gym workout tracker for iOS, Android and the web, built with Expo and React Native. Plan your routines, log every set in the gym, and see your progress — no account, no signal needed.
 
-**Try it:** web version (link coming with the first deploy) · Android APK (GitHub Releases, coming soon)
+**[Open the web app](https://forge-nine-sigma.vercel.app)** · **[Download for Android (APK)](https://github.com/MarcCodesAgain/forge/releases/latest/download/forge.apk)** · [Privacy policy](https://forge-nine-sigma.vercel.app/privacy)
+
+On Android, open the APK and allow installing from your browser when asked. Your workouts stay on your phone.
 
 > The UI is in Spanish.
 
@@ -84,8 +86,8 @@ npx eas-cli build --platform all --profile production       # store builds (AAB 
 ```
 
 - **Web**: `npm run export:web` and deploy `dist/` (Vercel config included; every path falls back to `index.html`).
-- **Android**: the `preview` profile produces an APK that can be downloaded and installed directly.
-- **App Store / Google Play**: the app is ready on the technical side (icons, splash, bundle ids, privacy policy at `/privacy`, no data collection, in-app data deletion). Publishing needs developer accounts and store listings.
+- **Android**: the `preview` profile produces an APK; each version is attached to a [GitHub Release](https://github.com/MarcCodesAgain/forge/releases) as `forge.apk`, so the download link above always points to the latest one.
+- **App Store / Google Play**: the app is ready on the technical side (icons, splash, bundle ids, [privacy policy](https://forge-nine-sigma.vercel.app/privacy), no data collection, in-app data deletion). Publishing needs developer accounts and store listings.
 
 ## Roadmap
 
