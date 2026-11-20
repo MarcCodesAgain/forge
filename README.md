@@ -96,6 +96,10 @@ npx eas-cli build --platform all --profile production       # store builds (AAB 
 - Nutrition tracking and progress photos.
 - English localisation.
 
+## Author
+
+Built by Marc Llopis. More projects and experience at [marcllopis-portfolio.vercel.app](https://marcllopis-portfolio.vercel.app).
+
 ## License
 
 [MIT](LICENSE)
