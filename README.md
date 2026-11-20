@@ -35,12 +35,13 @@ Expo SDK 57 · React Native 0.86 · Expo Router (typed routes) · TypeScript · 
 
 ```
 app/                       Screens (Expo Router, file-based)
-├── (tabs)/                Home, Routines, History
+├── (tabs)/                Home (/home), Routines, History
 ├── plan/                  Create / edit a routine
 ├── session/[planId]/[dayId]   Live workout
 ├── log/[logId]            Past session detail
 ├── settings.tsx           Data, backups, delete everything
-└── privacy.tsx            Privacy policy (also the public /privacy URL on the web build)
+├── privacy.tsx            Privacy policy (also the public /privacy URL on the web build)
+└── index.tsx              Web: product landing page (src/landing). Native: redirects to /home
 src/
 ├── store/
 │   ├── workoutData.ts     Pure state transitions + backup format/validation (unit-tested)

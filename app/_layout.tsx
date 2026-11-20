@@ -55,6 +55,7 @@ function RootNavigator() {
         contentStyle: { backgroundColor: '#080808' },
       }}
     >
+      <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="plan/new" options={{ title: 'Nueva rutina', presentation: 'modal' }} />
       <Stack.Screen name="plan/edit/[id]" options={{ title: 'Editar rutina' }} />
