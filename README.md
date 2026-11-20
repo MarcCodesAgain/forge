@@ -27,7 +27,7 @@ The trade-off is that data doesn't sync between devices. Backups cover moving to
 
 ## Tech stack
 
-Expo SDK 56 · React Native 0.85 · Expo Router (typed routes) · TypeScript · Zustand (`persist` middleware) · react-native-svg · Vitest · EAS Build
+Expo SDK 57 · React Native 0.86 · Expo Router (typed routes) · TypeScript · Zustand (`persist` middleware) · react-native-svg · Vitest · EAS Build
 
 ## Architecture
 

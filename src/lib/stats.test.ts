@@ -52,3 +52,12 @@ describe('sessionsInMonth', () => {
     expect(sessionsInMonth([log(at(2026, 11, 1)), log(at(2026, 11, 18)), log(at(2026, 10, 31))], today)).toBe(2);
   });
 });
+
+describe('plural', async () => {
+  const { plural } = await import('./plural');
+  it('uses the singular only for exactly one', () => {
+    expect(plural(1, 'serie', 'series')).toBe('1 serie');
+    expect(plural(0, 'serie', 'series')).toBe('0 series');
+    expect(plural(3, 'serie', 'series')).toBe('3 series');
+  });
+});

@@ -6,6 +6,7 @@ import { useWorkoutStore } from '@/src/store/workoutStore';
 import { Colors, Typography, Spacing, Radius, GlassCard } from '@/src/theme';
 import ProgressChart from '@/src/components/ProgressChart';
 import { usePRs, useActivePlanExercises, useAllExerciseNames } from '@/src/hooks/usePerformanceStats';
+import { plural } from '@/src/lib/plural';
 
 export default function HistoryScreen() {
   const router = useRouter();
@@ -173,7 +174,7 @@ export default function HistoryScreen() {
                 <View style={styles.sessionInfo}>
                   <Text style={styles.sessionDay}>{dayName}</Text>
                   <Text style={styles.sessionDetail}>
-                    {completed} series{vol > 0 ? ` · ${vol.toFixed(0)} kg` : ''}
+                    {plural(completed, 'serie', 'series')}{vol > 0 ? ` · ${vol.toFixed(0)} kg` : ''}
                   </Text>
                 </View>
                 <View style={styles.sessionRight}>
@@ -185,7 +186,7 @@ export default function HistoryScreen() {
           })}
           {sorted.length > sessionLimit && (
             <TouchableOpacity style={styles.showMoreBtn} onPress={() => setSessionLimit(l => l + 10)}>
-              <Text style={styles.showMoreText}>Ver más ({sorted.length - sessionLimit} sesiones)</Text>
+              <Text style={styles.showMoreText}>Ver más ({plural(sorted.length - sessionLimit, 'sesión', 'sesiones')})</Text>
               <Ionicons name="chevron-down" size={14} color={Colors.accent} />
             </TouchableOpacity>
           )}

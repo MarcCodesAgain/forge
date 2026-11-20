@@ -9,8 +9,7 @@ import { confirm, notify } from '@/src/lib/confirm';
 import { getWorkoutData, useWorkoutStore } from '@/src/store/workoutStore';
 import { InvalidBackupError } from '@/src/store/workoutData';
 import { Colors, Radius, Spacing, Typography } from '@/src/theme';
-
-const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+import { plural } from '@/src/lib/plural';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -65,7 +64,7 @@ export default function SettingsScreen() {
       if (!backup) return;
       const ok = await confirm(
         'Restaurar copia de seguridad',
-        `Contiene ${count(backup.plans.length, 'rutina', 'rutinas')} y ${count(backup.logs.length, 'entreno', 'entrenos')}. Sustituirá todos los datos actuales de este dispositivo.`,
+        `Contiene ${plural(backup.plans.length, 'rutina', 'rutinas')} y ${plural(backup.logs.length, 'entreno', 'entrenos')}. Sustituirá todos los datos actuales de este dispositivo.`,
         'Restaurar',
         true,
       );
@@ -100,7 +99,7 @@ export default function SettingsScreen() {
           Forge guarda todo solo en este dispositivo: no hay cuenta ni servidor y funciona sin conexión.
         </Text>
         <Text style={styles.stats}>
-          {count(plans.length, 'rutina', 'rutinas')} · {count(logs.length, 'entreno', 'entrenos')} · {count(weightLogs.length, 'registro de peso', 'registros de peso')}
+          {plural(plans.length, 'rutina', 'rutinas')} · {plural(logs.length, 'entreno', 'entrenos')} · {plural(weightLogs.length, 'registro de peso', 'registros de peso')}
         </Text>
       </View>
 

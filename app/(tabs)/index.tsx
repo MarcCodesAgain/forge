@@ -8,6 +8,7 @@ import { localDateKey } from '@/src/store/workoutData';
 import { Colors, Typography, Spacing, Radius, GlassCard, OrangeGlow } from '@/src/theme';
 import { useWeekVolumes, useWeekStreak, useSessionsThisMonth } from '@/src/hooks/useWeekStats';
 import { notify } from '@/src/lib/confirm';
+import { plural } from '@/src/lib/plural';
 
 const WEEK_LABELS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 
@@ -231,7 +232,7 @@ export default function HomeScreen() {
             <View style={styles.todayMeta}>
               <View style={styles.todayMetaItem}>
                 <Ionicons name="list-outline" size={14} color={Colors.textTertiary} />
-                <Text style={styles.todayMetaText}>{activeDay?.exercises.length ?? 0} ejercicios</Text>
+                <Text style={styles.todayMetaText}>{plural(activeDay?.exercises.length ?? 0, 'ejercicio', 'ejercicios')}</Text>
               </View>
               {activeDay?.id !== suggestedDay?.id && (
                 <TouchableOpacity onPress={() => setSelectedDayId(null)} style={styles.todayMetaItem}>

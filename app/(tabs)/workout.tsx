@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useWorkoutStore } from '@/src/store/workoutStore';
 import { Colors, Typography, Spacing, Radius, GlassCard } from '@/src/theme';
 import { confirm, notify } from '@/src/lib/confirm';
+import { plural } from '@/src/lib/plural';
 
 export default function WorkoutScreen() {
   const router = useRouter();
@@ -79,7 +80,7 @@ export default function WorkoutScreen() {
                   <View style={styles.dayDot} />
                   <View>
                     <Text style={styles.dayName}>{day.name}</Text>
-                    <Text style={styles.daySub}>{day.exercises.length} ejercicios</Text>
+                    <Text style={styles.daySub}>{plural(day.exercises.length, 'ejercicio', 'ejercicios')}</Text>
                   </View>
                 </View>
                 <View style={styles.dayAction}>

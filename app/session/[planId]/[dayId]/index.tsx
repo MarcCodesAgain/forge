@@ -9,6 +9,7 @@ import { Colors, Typography, Spacing, Radius, GlassCard, OrangeGlow } from '@/sr
 import RestTimer from '@/src/components/RestTimer';
 import { usePrevSets } from '@/src/hooks/usePrevSets';
 import { confirm, notify } from '@/src/lib/confirm';
+import { plural } from '@/src/lib/plural';
 
 const REST_SECONDS = 90;
 
@@ -67,7 +68,7 @@ export default function SessionScreen() {
       notify('Error al guardar', error);
       return;
     }
-    const seeHistory = await confirm('¡Entreno guardado!', `${completedCount} ${completedCount === 1 ? 'serie completada' : 'series completadas'}.`, 'Ver historial');
+    const seeHistory = await confirm('¡Entreno guardado!', `${plural(completedCount, 'serie completada', 'series completadas')}.`, 'Ver historial');
     if (seeHistory) router.replace('/(tabs)/history');
     else router.back();
   };
